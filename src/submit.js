@@ -122,26 +122,29 @@ async function runScheduledSubmission() {
 
     // Ensure screenshots directory exists
     const screenshotsDir = path.resolve('screenshots');
-    if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir);
+    if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir, { recursive: true });
     let screenshotIndex = 0;
 
     async function takeScreenshot(label) {
       screenshotIndex++;
       const filename = path.join(screenshotsDir, `page-${String(screenshotIndex).padStart(2, '0')}-${label}.png`);
-      await page.screenshot({ path: filename, fullPage: true });
+      await page.screenshot({ path: filename, fullPage: true }).catch(() => {});
       console.log(`  📸 Screenshot saved: ${filename}`);
     }
 
-    // Helper: fill all required fields on the current page
+    // Helper: fill all required fields on the current page section
     async function fillCurrentPage() {
-      // 1. Email consent checkbox — Google Forms renders this as div[role="checkbox"], not input
-      const emailCheckbox = page.locator('div[role="checkbox"]').first();
-      if (await emailCheckbox.isVisible({ timeout: 2000 }).catch(() => false)) {
-        const ariaChecked = await emailCheckbox.getAttribute('aria-checked').catch(() => 'false');
-        if (ariaChecked !== 'true') {
-          console.log('Checking email consent checkbox...');
-          await emailCheckbox.click({ force: true });
-          await page.waitForTimeout(500);
+      // 1. Email consent checkbox
+      const emailCheckboxes = page.locator('div[role="checkbox"]');
+      const cbCount = await emailCheckboxes.count().catch(() => 0);
+      for (let i = 0; i < cbCount; i++) {
+        const cb = emailCheckboxes.nth(i);
+        const ariaChecked = await cb.getAttribute('aria-checked').catch(() => 'false');
+        const text = await cb.innerText().catch(() => '');
+        if (ariaChecked !== 'true' && text.toLowerCase().includes('email')) {
+          console.log('  Checking email consent checkbox...');
+          await cb.click({ force: true }).catch(() => {});
+          await page.waitForTimeout(300);
         }
       }
 
@@ -150,40 +153,50 @@ async function runScheduledSubmission() {
       if (await workingDayRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
         const selected = await workingDayRadio.getAttribute('aria-checked').catch(() => 'false');
         if (selected !== 'true') {
-          console.log('Clicking working day radio choice...');
-          await workingDayRadio.click({ force: true });
-          await page.waitForTimeout(500);
+          console.log('  Selecting working day radio choice...');
+          await workingDayRadio.click({ force: true }).catch(() => {});
+          await page.waitForTimeout(300);
         }
       }
 
-      // 3. Fill any empty required textareas
-      const textareas = page.locator('textarea');
-      const count = await textareas.count();
-      for (let i = 0; i < count; i++) {
-        const area = textareas.nth(i);
-        const val = await area.inputValue().catch(() => '');
-        if (!val || val.trim() === '') {
-          await area.fill(journalSummaryText);
+      // 3. Fill any empty textareas or text inputs
+      const textFields = page.locator('textarea, input[type="text"]:not([readonly])');
+      const fieldCount = await textFields.count().catch(() => 0);
+      for (let i = 0; i < fieldCount; i++) {
+        const field = textFields.nth(i);
+        if (await field.isVisible().catch(() => false)) {
+          const val = await field.inputValue().catch(() => '');
+          if (!val || val.trim() === '') {
+            await field.fill(journalSummaryText).catch(() => {});
+          }
         }
       }
     }
 
-    // Fill page 1 fields on initial load
+    // Fill Page 1 initial fields
     await fillCurrentPage();
     await takeScreenshot('initial-load');
 
-    // Loop through form pages (handles Multi-Page Forms with Next buttons)
-    let maxPages = 15;
+    // Loop through form pages
+    let maxPages = 10;
     let pageCount = 0;
+    let previousSectionHeading = '';
+
     while (maxPages > 0) {
       maxPages--;
       pageCount++;
-      console.log(`Processing form page ${pageCount}...`);
 
-      // Loop iteration: take screenshot of current page state
+      // Extract current section heading to detect page navigation
+      const currentHeading = await page.evaluate(() => {
+        const h = document.querySelector('[role="heading"], .M7eMe');
+        return h ? h.innerText.trim() : '';
+      }).catch(() => '');
+
+      console.log(`Processing section ${pageCount} ("${currentHeading || 'Form Page'}")`);
+      await fillCurrentPage();
       await takeScreenshot(`section-${pageCount}`);
 
-      // Check if Submit button is visible
+      // Check for Submit button first
       const submitButton = page
         .getByRole('button', { name: /^submit$|^submit response$|^send$|^bhejein$|^सबमिट करें$|^जमा करें$/i })
         .or(page.locator('div[role="button"]:has-text("Submit")'))
@@ -206,7 +219,7 @@ async function runScheduledSubmission() {
         break;
       }
 
-      // Check if Next button is visible
+      // Check for Next button
       const nextButton = page
         .getByRole('button', { name: /^next$|^siguiente$|^aage$/i })
         .or(page.locator('div[role="button"]:has-text("Next")'))
@@ -216,15 +229,26 @@ async function runScheduledSubmission() {
         console.log('Next button found. Navigating to next section...');
 
         await Promise.all([
-          page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {}),
+          page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 8000 }).catch(() => {}),
           nextButton.click(),
         ]);
         await page.waitForTimeout(1000);
 
-        // Fill any required fields on the new page
-        await fillCurrentPage();
+        const newHeading = await page.evaluate(() => {
+          const h = document.querySelector('[role="heading"], .M7eMe');
+          return h ? h.innerText.trim() : '';
+        }).catch(() => '');
+
+        // If page heading did not change, check if validation failed and retry
+        if (newHeading === currentHeading && newHeading === previousSectionHeading) {
+          console.log('Page did not navigate. Re-verifying required fields...');
+          await fillCurrentPage();
+          await nextButton.click().catch(() => {});
+          await page.waitForTimeout(1500);
+        }
+        previousSectionHeading = currentHeading;
       } else {
-        // If neither Next nor Submit button found separately, try first available primary button
+        // Fallback for primary action button
         const primaryButton = page.locator('div[role="button"][jsaction*="click"]').last();
         if (await primaryButton.isVisible({ timeout: 2000 }).catch(() => false)) {
           const btnText = await primaryButton.innerText().catch(() => '');
@@ -269,8 +293,7 @@ async function runScheduledSubmission() {
       if (finalUrl.includes('accounts.google.com')) {
         throw new Error('Session expired during submission. Please run "npm run login" again.');
       }
-      // Take a screenshot so the user can verify manually
-      await page.screenshot({ path: 'submit-result.png', fullPage: true });
+      await page.screenshot({ path: 'submit-result.png', fullPage: true }).catch(() => {});
       console.log('\n✅ Form submitted. Could not detect confirmation text — check submit-result.png to verify.');
     }
     await browser.close();
@@ -278,12 +301,11 @@ async function runScheduledSubmission() {
   } catch (error) {
     console.error('\n❌ SUBMISSION FAILED:', error.message);
     if (browser) {
-      // Try to grab a failure screenshot if page is still open
       try {
         const pages = browser.contexts()?.[0]?.pages();
         if (pages && pages.length > 0) {
           const screenshotsDir = path.resolve('screenshots');
-          if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir);
+          if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir, { recursive: true });
           await pages[0].screenshot({ path: path.join(screenshotsDir, 'error-state.png'), fullPage: true });
           console.error('  📸 Error screenshot saved: screenshots/error-state.png');
         }
