@@ -2,7 +2,7 @@ name: Daily Coursework Journal Submission
 
 on:
   schedule:
-    # 4:00 PM IST (16:00 IST) = 10:30 AM UTC, Monday to Friday (1-5)
+    # 4:00 PM IST (16:00 IST) = 10:30 AM UTC, Monday–Friday only
     - cron: '30 10 * * 1-5'
   workflow_dispatch:
 
@@ -31,13 +31,22 @@ jobs:
           STORAGE_STATE_BASE64: ${{ secrets.STORAGE_STATE_BASE64 }}
         run: |
           if [ -z "$STORAGE_STATE_BASE64" ]; then
-            echo "::error::STORAGE_STATE_BASE64 secret is missing!"
+            echo "::error::STORAGE_STATE_BASE64 secret is missing or empty!"
             exit 1
           fi
           echo "$STORAGE_STATE_BASE64" | base64 -d > storageState.json
+          echo "storageState.json restored successfully."
 
-      - name: Run Daily Journal Submission Script
+      - name: Run Journal Submission Script
         env:
-          DISABLE_SUBMIT: ${{ secrets.DISABLE_SUBMIT }}
-          DRY_RUN: ${{ secrets.DRY_RUN }}
+          FORM_ID: ${{ secrets.FORM_ID }}
+          ENTRY_MAP: ${{ secrets.ENTRY_MAP }}
+          GH_OWNER: ${{ secrets.GH_OWNER }}
+          GH_REPO: ${{ secrets.GH_REPO }}
+          GH_USERNAME: ${{ secrets.GH_USERNAME }}
+          COMMIT_READ_TOKEN: ${{ secrets.COMMIT_READ_TOKEN }}
+          TIMEZONE: ${{ secrets.TIMEZONE }}
+          STORAGE_STATE_PATH: storageState.json
+          DISABLE_SUBMIT: "false"
+          DRY_RUN: "false"
         run: npm start
