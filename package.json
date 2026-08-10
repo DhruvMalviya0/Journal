@@ -1,0 +1,19 @@
+{
+  "name": "automated-coursework-journal",
+  "version": "1.0.0",
+  "description": "Automated coursework daily journal submitter for Google Forms using GitHub commit activity and authenticated Playwright session.",
+  "type": "module",
+  "main": "src/submit.js",
+  "scripts": {
+    "login": "node scripts/login.js",
+    "start": "node src/submit.js",
+    "test": "node --test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "playwright": "^1.50.1"
+  }
+}

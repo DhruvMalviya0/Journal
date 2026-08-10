@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Environment and Secrets
+.env
+.env.local
+storageState.json
+
+# Playwright / Testing
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# OS / Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
