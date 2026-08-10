@@ -45,5 +45,7 @@ jobs:
           GH_REPO: ${{ secrets.GH_REPO }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
           COMMIT_READ_TOKEN: ${{ secrets.COMMIT_READ_TOKEN }}
-          TIMEZONE: ${{ secrets.TIMEZONE || 'Asia/Kolkata' }}
+          TIMEZONE: ${{ secrets.TIMEZONE }}
+          DISABLE_SUBMIT: ${{ secrets.DISABLE_SUBMIT }}
+          DRY_RUN: ${{ secrets.DRY_RUN }}
         run: npm start

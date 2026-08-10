@@ -44,14 +44,8 @@ npm install
 ### 3. Extracting Google Form ID and Entry ID
 1. Open your target Google Form in a web browser.
 2. Click the three dots (⋮) menu at top right and select **"Get pre-filled link"**.
-3. Type dummy text (e.g., `TEST_ENTRY`) into the journal text field.
-4. Click **"Get link"** at the bottom and copy the generated link.
-5. Inspect the generated link:
-   ```
-   https://docs.google.com/forms/d/e/1FAIpQLSc_EXAMPLE_ID/viewform?usp=pp_url&entry.123456789=TEST_ENTRY
-   ```
-   - **Form ID**: `1FAIpQLSc_EXAMPLE_ID` (portion between `/d/e/` and `/viewform`)
-   - **Entry ID**: `entry.123456789` (or `123456789`)
+3. Type dummy text into the fields and click **"Get link"** at the bottom.
+4. Copy the link and inspect the query parameters (`entry.XXXXXXX`).
 
 ### 4. Local Environment Configuration
 Copy `.env.example` to `.env` and fill in your details:
@@ -61,12 +55,12 @@ cp .env.example .env
 Edit `.env`:
 ```env
 FORM_ID=1FAIpQLSc_EXAMPLE_ID
-ENTRY_ID=entry.123456789
+ENTRY_MAP={"entry.187493348":"It was a working day, and I was present","entry.32162408":"JOURNAL_TEXT"}
 GH_OWNER=your-github-username
 GH_REPO=your-repository-name
 GH_USERNAME=your-github-username
-COMMIT_READ_TOKEN=github_pat_... # Optional for private repos
 TIMEZONE=Asia/Kolkata
+DISABLE_SUBMIT=true # Set to true to fill form without submitting
 ```
 
 ---
@@ -84,6 +78,17 @@ npm run login
 
 > ⚠️ **CRITICAL SECURITY NOTE:**
 > Never commit `storageState.json` to source control. It is already added to `.gitignore`.
+
+---
+
+## 🔒 Dry Run & Form Fill Disable Mode
+
+To test or fill out the form without performing the final submission click:
+- Set `DISABLE_SUBMIT=true` or `DRY_RUN=true` in your `.env` file, or
+- Pass `--dry-run` or `--disable-submit` flag when executing:
+```bash
+node src/submit.js --dry-run
+```
 
 ---
 
@@ -109,12 +114,12 @@ base64 -w 0 storageState.json | pbcopy # or xclip
 | :--- | :--- |
 | `STORAGE_STATE_BASE64` | Base64-encoded string of `storageState.json` |
 | `FORM_ID` | Google Form ID (e.g. `1FAIpQLSc_...`) |
-| `ENTRY_ID` | Form field Entry ID (e.g. `entry.123456789`) |
+| `ENTRY_MAP` | JSON mapping of `entry.XXXXXXX` field IDs to values |
 | `GH_OWNER` | Target GitHub repository owner |
 | `GH_REPO` | Target GitHub repository name |
 | `GH_USERNAME` | GitHub username to filter commit authorship |
-| `COMMIT_READ_TOKEN` | *(Optional)* GitHub PAT with `repo:read` scope for private repos |
 | `TIMEZONE` | Timezone string (default: `Asia/Kolkata`) |
+| `DISABLE_SUBMIT` | *(Optional)* Set to `true` to disable actual submission |
 
 ---
 
@@ -129,7 +134,7 @@ The GitHub Actions workflow (`.github/workflows/daily-journal.yml`) runs automat
 
 ## 🧪 Testing Locally
 
-To test the full submission pipeline locally:
+To test the submission pipeline locally:
 ```bash
 npm start
 ```
@@ -149,7 +154,6 @@ Google session cookies eventually expire (typically after a few weeks or months)
 - The GitHub Action run will fail.
 - The failure output will explicitly report:
   `Authentication failed! redirected to Google sign-in page.`
-- GitHub sends an email notification on workflow failure.
 
 ### How to refresh an expired session:
 1. Run `npm run login` locally on your machine.

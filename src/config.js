@@ -16,9 +16,15 @@ function normalizeEntryMap(map) {
 }
 
 function parseEntryMap() {
-  if (process.env.ENTRY_MAP) {
+  let envVal = process.env.ENTRY_MAP;
+  if (envVal) {
+    envVal = envVal.trim();
+    // Strip surrounding quotes if present
+    if ((envVal.startsWith("'") && envVal.endsWith("'")) || (envVal.startsWith('"') && envVal.endsWith('"'))) {
+      envVal = envVal.substring(1, envVal.length - 1);
+    }
     try {
-      const parsed = JSON.parse(process.env.ENTRY_MAP);
+      const parsed = JSON.parse(envVal);
       return normalizeEntryMap(parsed);
     } catch {
       console.warn('Warning: Failed to parse ENTRY_MAP JSON env var. Falling back to ENTRY_ID.');
@@ -36,11 +42,18 @@ export const config = {
   githubOwner: process.env.GH_OWNER || '',
   githubRepo: process.env.GH_REPO || '',
   githubUsername: process.env.GH_USERNAME || '',
-  commitReadToken: process.env.COMMIT_READ_TOKEN || process.env.GITHUB_TOKEN || '',
+  commitReadToken: process.env.COMMIT_READ_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
 
   formId: process.env.FORM_ID || '',
   entryMap: parseEntryMap(),
 
   storageStatePath: process.env.STORAGE_STATE_PATH || 'storageState.json',
   timezone: process.env.TIMEZONE || 'Asia/Kolkata',
+
+  // Dry run / disable submit flag
+  dryRun:
+    process.env.DRY_RUN === 'true' ||
+    process.env.DISABLE_SUBMIT === 'true' ||
+    process.argv.includes('--dry-run') ||
+    process.argv.includes('--disable-submit'),
 };

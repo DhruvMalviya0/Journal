@@ -29,6 +29,10 @@ export function isSunday(timezone = 'Asia/Kolkata', referenceDate = new Date()) 
 async function runScheduledSubmission() {
   console.log('=== Automated Coursework Journal Submission ===\n');
 
+  if (config.dryRun) {
+    console.log('⚠️ [DRY RUN MODE ENABLED] Form submission is disabled via configuration (DRY_RUN / DISABLE_SUBMIT).\n');
+  }
+
   // 1. Day-of-week check (Skip Sunday)
   if (isSunday(config.timezone)) {
     console.log(`[SKIP] Today is Sunday in ${config.timezone}. Skipping journal submission as scheduled.`);
@@ -135,6 +139,13 @@ async function runScheduledSubmission() {
         .first();
 
       if (await submitButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+        if (config.dryRun) {
+          console.log('\n🔒 [DRY RUN / FORM FILL DISABLED] Submit button located. Form was filled & validated successfully!');
+          console.log('Skipping actual form submission as DRY_RUN / DISABLE_SUBMIT is enabled.\n');
+          await browser.close();
+          process.exit(0);
+        }
+
         console.log('Submit button found. Submitting form response...');
         await submitButton.click();
         break;
@@ -170,6 +181,12 @@ async function runScheduledSubmission() {
         const primaryButton = page.locator('div[role="button"][jsaction*="click"]').last();
         if (await primaryButton.isVisible({ timeout: 2000 }).catch(() => false)) {
           const btnText = await primaryButton.innerText().catch(() => '');
+          if (config.dryRun && /submit/i.test(btnText)) {
+            console.log(`\n🔒 [DRY RUN / FORM FILL DISABLED] Primary action button '${btnText.trim()}' located.`);
+            console.log('Skipping actual form submission as DRY_RUN / DISABLE_SUBMIT is enabled.\n');
+            await browser.close();
+            process.exit(0);
+          }
           console.log(`Clicking primary action button ('${btnText.trim()}')...`);
           await primaryButton.click();
           await page.waitForTimeout(1000);
@@ -177,6 +194,12 @@ async function runScheduledSubmission() {
           break;
         }
       }
+    }
+
+    if (config.dryRun) {
+      console.log('\n🔒 [DRY RUN / FORM FILL DISABLED] Form process completed in Dry Run mode.');
+      await browser.close();
+      process.exit(0);
     }
 
     // 7. Verify Success Confirmation
