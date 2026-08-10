@@ -1,140 +1,96 @@
 # 🤖 Automated Coursework Journal Submission System
 
-Automated daily coursework journal submission to Google Forms with verified Google account authentication.
+Automated daily coursework journal submission to Google Forms with verified Google account authentication (`@kalvium.community`).
 
-This system automatically fetches daily GitHub commit activity from a specified repository, formats it into a concise journal summary, constructs a pre-filled Google Form URL, and uses a headless Playwright browser session carrying authenticated Google login credentials to submit the response.
-
----
-
-## 🏛️ Architecture & Submission Flow
-
-```
-+------------------+     +------------------------+     +-------------------------+
-| GitHub REST API  | --> | Commit Summarizer      | --> | Pre-filled URL Builder  |
-| (Today's Commits)|     | (Filter by Username)   |     | (entry.XXXXXXX Params)  |
-+------------------+     +------------------------+     +-------------------------+
-                                                                     |
-                                                                     v
-+------------------+     +------------------------+     +-------------------------+
-| Verified Google  | --> | Playwright Headless    | --> | Submit Button Click &   |
-| Session (Cookies)|     | Browser Session        |     | Success Verification    |
-+------------------+     +------------------------+     +-------------------------+
-```
-
-### Why Playwright Session?
-Google Forms' **"Collect email addresses (Verified)"** setting only populates when submitted through an active browser session signed into the designated Google account. Raw HTTP POST requests to `formResponse` fail to attach the verified email identity. Playwright loads the pre-filled URL with a restored `storageState.json` context, ensuring the submission is authenticated.
+This system automatically fetches daily GitHub commit activity from a specified repository, formats it into a concise journal summary, constructs a pre-filled Google Form URL, and uses a headless Playwright browser session carrying authenticated Google login credentials to submit responses automatically **Monday to Friday at 4:00 PM IST**.
 
 ---
 
-## 🛠️ Step-by-Step Setup Guide
+## 🚀 Quick Start Guide (3 Minutes Setup)
 
 ### 1. Prerequisites
-- **Node.js**: v20 or higher
-- **npm**: v10 or higher
-- **Google Account**: Signed into the coursework Google account
+- **Node.js**: v20 or higher ([Download Node.js](https://nodejs.org/))
+- **Git**: Installed on your system
+- **Google Account**: Signed into your coursework Google account (`@kalvium.community`)
 
-### 2. Installation
-Clone the repository and install dependencies:
+### 2. Clone & Install
 ```bash
-git clone <your-journal-repo-url>
-cd automated-coursework-journal
+git clone https://github.com/Raph1710/Journal-Autofill.git
+cd Journal-Autofill
 npm install
 ```
 
-### 3. Extracting Google Form ID and Entry ID
-1. Open your target Google Form in a web browser.
-2. Click the three dots (⋮) menu at top right and select **"Get pre-filled link"**.
-3. Type dummy text into the fields and click **"Get link"** at the bottom.
-4. Copy the link and inspect the query parameters (`entry.XXXXXXX`).
-
-### 4. Local Environment Configuration
-Copy `.env.example` to `.env` and fill in your details:
-```bash
-cp .env.example .env
-```
-Edit `.env`:
-```env
-FORM_ID=1FAIpQLSc_EXAMPLE_ID
-ENTRY_MAP={"entry.187493348":"It was a working day, and I was present","entry.32162408":"JOURNAL_TEXT"}
-GH_OWNER=your-github-username
-GH_REPO=your-repository-name
-GH_USERNAME=your-github-username
-TIMEZONE=Asia/Kolkata
-DISABLE_SUBMIT=true # Set to true to fill form without submitting
-```
-
 ---
 
-## 🔑 One-Time Interactive Authentication
+## 🔑 Step-by-Step Setup Instructions
 
-Run the interactive login script to authenticate your Google session locally:
+### Step 1: One-Time Local Interactive Login
+Run the interactive authentication script to log into your Google account locally:
+
 ```bash
 npm run login
 ```
-1. A visible browser window will open navigating to the Google Form / Google Login page.
-2. Sign in to your verified coursework Google account.
-3. Once logged in and viewing the form with your verified email, return to the terminal and press **[ENTER]**.
-4. The authenticated cookies and local storage will be saved to `storageState.json`.
 
-> ⚠️ **CRITICAL SECURITY NOTE:**
-> Never commit `storageState.json` to source control. It is already added to `.gitignore`.
+1. A visible Chromium browser window will launch navigating to the Google Form.
+2. Sign in to your verified coursework Google account (`@kalvium.community`).
+3. Ensure you can view the form with your verified email banner displayed.
+4. Return to your terminal and press **[ENTER]**.
+5. Your session cookies will be securely saved to `storageState.json`.
 
----
-
-## 🔒 Dry Run & Form Fill Disable Mode
-
-To test or fill out the form without performing the final submission click:
-- Set `DISABLE_SUBMIT=true` or `DRY_RUN=true` in your `.env` file, or
-- Pass `--dry-run` or `--disable-submit` flag when executing:
-```bash
-node src/submit.js --dry-run
-```
+> ⚠️ **SECURITY WARNING:**  
+> `storageState.json` contains your active login session. **NEVER** commit `storageState.json` to GitHub! It is already added to `.gitignore`.
 
 ---
 
-## 🔐 Encrypting & Adding Secrets to GitHub Actions
+### Step 2: Base64 Encode Your Session
+Convert `storageState.json` into a Base64 string so GitHub Actions can use it headlessly:
 
-To allow GitHub Actions to run headlessly on schedule, convert `storageState.json` to a Base64 string and add it to your repository secrets:
-
-### On Windows (PowerShell):
+#### On Windows (PowerShell):
 ```powershell
-[Convert]::ToBase64String([IO.File]::ReadAllBytes('storageState.json')) | Set-Clipboard
+[Convert]::ToBase64String([System.IO.File]::ReadAllBytes("storageState.json")) | Set-Clipboard
 ```
+*(This automatically copies the Base64 string to your clipboard!)*
 
-### On macOS / Linux (Terminal):
+#### On macOS / Linux (Terminal):
 ```bash
-base64 -w 0 storageState.json | pbcopy # or xclip
+base64 -w 0 storageState.json | pbcopy   # macOS
+# OR
+base64 -w 0 storageState.json | xclip -selection clipboard   # Linux
 ```
-
-### Adding Secrets in GitHub:
-1. Navigate to your GitHub Repository -> **Settings** -> **Secrets and variables** -> **Actions**.
-2. Click **New repository secret** and add the following secrets:
-
-| Secret Name | Value Description |
-| :--- | :--- |
-| `STORAGE_STATE_BASE64` | Base64-encoded string of `storageState.json` |
-| `FORM_ID` | Google Form ID (e.g. `1FAIpQLSc_...`) |
-| `ENTRY_MAP` | JSON mapping of `entry.XXXXXXX` field IDs to values |
-| `GH_OWNER` | Target GitHub repository owner |
-| `GH_REPO` | Target GitHub repository name |
-| `GH_USERNAME` | GitHub username to filter commit authorship |
-| `TIMEZONE` | Timezone string (default: `Asia/Kolkata`) |
-| `DISABLE_SUBMIT` | *(Optional)* Set to `true` to disable actual submission |
 
 ---
 
-## ⏰ Automated Schedule & Manual Trigger
+### Step 3: Configure GitHub Secrets
 
-The GitHub Actions workflow (`.github/workflows/daily-journal.yml`) runs automatically:
-- **Schedule**: Every day at 4:00 PM IST (`10:30 UTC`).
-- **Sunday Check**: The submission script evaluates the current day-of-week in the specified timezone (`Asia/Kolkata`) and automatically skips execution on Sundays.
-- **Manual Execution**: Go to **Actions** tab -> **Daily Coursework Journal Submission** -> **Run workflow**.
+1. Fork or push this repository to your own GitHub account.
+2. Go to your repository on GitHub: **Settings** → **Secrets and variables** → **Actions** → **New repository secret**.
+3. Add the following secrets:
+
+| Secret Name | Value | Description |
+| :--- | :--- | :--- |
+| `STORAGE_STATE_BASE64` | *(Paste clipboard content)* | Base64 encoded Google login session |
+| `FORM_ID` | `1FAIpQLSc8RRUAG8n8nPB9dm21m_MxwHQ-JuDnEj7GnvwEkWXykkKFuQ` | Target Google Form ID |
+| `ENTRY_MAP` | `{"entry.187493348":"It was a working day, and I was present","entry.32162408":"JOURNAL_TEXT","entry.1874357572":"Encountered a few technical issues during implementation/testing, which were resolved by debugging the code, referring to documentation, and testing alternate approaches. Also resolved minor doubts regarding task requirements through self-analysis and review of existing resources.","entry.199221807":"A few issues/tasks are still in progress and could not be fully completed today due to their complexity or dependency on further testing/review. These will be prioritized and worked on in the coming days.","entry.1546753981":"Continue working on the pending tasks from today, complete testing/review of the current module, and move forward with the next set of planned tasks as per the schedule."}` | Multi-field question mapping |
+| `GH_OWNER` | `Raph1710` | GitHub repository owner |
+| `GH_REPO` | `Journal-Autofill` | Target repository name |
+| `GH_USERNAME` | `Your-GitHub-Username` | Your GitHub username |
+| `TIMEZONE` | `Asia/Kolkata` | Timezone string |
+| `DISABLE_SUBMIT` | `false` | `false` for live submissions (`true` for testing) |
+| `DRY_RUN` | `false` | `false` for live submissions (`true` for testing) |
+
+---
+
+## ⏰ Automated Schedule & Manual Triggers
+
+- **Automated Schedule**: Runs **Monday through Friday at 4:00 PM IST** (`10:30 UTC`).
+- **Sunday Check**: Sunday runs are automatically skipped.
+- **Manual Trigger**: Go to **Actions** tab on GitHub → Select **Daily Coursework Journal Submission** → Click **Run workflow**.
 
 ---
 
 ## 🧪 Testing Locally
 
-To test the submission pipeline locally:
+To test form filling locally without submitting:
 ```bash
 npm start
 ```
@@ -146,17 +102,13 @@ npm test
 
 ---
 
-## 🚨 Session Maintenance & Refreshing
+## 🚨 Troubleshooting & Session Maintenance
 
-Google session cookies eventually expire (typically after a few weeks or months).
+Google session cookies expire periodically (typically every few months).
 
-### How to identify an expired session:
-- The GitHub Action run will fail.
-- The failure output will explicitly report:
-  `Authentication failed! redirected to Google sign-in page.`
-
-### How to refresh an expired session:
-1. Run `npm run login` locally on your machine.
-2. Sign in to Google again.
-3. Re-encode `storageState.json` to Base64.
+### If your GitHub Action fails:
+1. Check the GitHub Actions logs. If you see:
+   `Authentication failed! redirected to Google sign-in page.`
+2. Re-run `npm run login` locally on your machine.
+3. Re-encode `storageState.json` to Base64 using PowerShell/Terminal.
 4. Update the `STORAGE_STATE_BASE64` secret in GitHub Repository Settings.
