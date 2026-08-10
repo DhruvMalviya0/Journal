@@ -49,3 +49,10 @@ test('getFormattedToday formats YYYY-MM-DD correctly', () => {
   const formatted = getFormattedToday('UTC', date);
   assert.strictEqual(formatted, '2026-08-10');
 });
+
+test('getMidnightISO returns correct UTC ISO for target timezone midnight', () => {
+  // On 2026-08-10, IST (+05:30) midnight is 2026-08-09T18:30:00.000Z
+  const refDate = new Date('2026-08-10T10:00:00Z');
+  const iso = getMidnightISO('Asia/Kolkata', refDate);
+  assert.strictEqual(iso, '2026-08-09T18:30:00.000Z');
+});

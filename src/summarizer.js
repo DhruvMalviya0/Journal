@@ -1,44 +1,77 @@
 /**
  * Calculates ISO 8601 string representing midnight (00:00:00) of today in the given timezone.
- * @param {string} timezone - IANA timezone string e.g. 'Asia/Kolkata'
- * @param {Date} [referenceDate] - Date reference (default: now)
+ * Uses deterministic UTC offset math without locale-dependent date string parsing.
+ *
+ * @param {string} [timezone='Asia/Kolkata'] - IANA timezone string e.g. 'Asia/Kolkata'
+ * @param {Date} [referenceDate=new Date()] - Date reference
  * @returns {string} ISO timestamp
  */
 export function getMidnightISO(timezone = 'Asia/Kolkata', referenceDate = new Date()) {
+  let tz = timezone;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+  } catch {
+    console.warn(`Warning: Invalid timezone '${timezone}'. Defaulting to 'Asia/Kolkata'.`);
+    tz = 'Asia/Kolkata';
+  }
+
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
+    timeZone: tz,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-    hour12: false,
   }).formatToParts(referenceDate);
 
-  const month = parts.find((p) => p.type === 'month')?.value;
-  const day = parts.find((p) => p.type === 'day')?.value;
-  const year = parts.find((p) => p.type === 'year')?.value;
+  const month = parts.find((p) => p.type === 'month')?.value || '01';
+  const day = parts.find((p) => p.type === 'day')?.value || '01';
+  const year = parts.find((p) => p.type === 'year')?.value || '1970';
 
-  // Form YYYY-MM-DD string
-  const dateStr = `${year}-${month}-${day}`;
+  // Benchmark reference date for midnight UTC of target day
+  const refUtc = new Date(`${year}-${month}-${day}T00:00:00.000Z`);
 
-  // Get offset at midnight in target timezone
-  const midnightUtc = new Date(`${dateStr}T00:00:00Z`);
-  const localStr = midnightUtc.toLocaleString('en-US', { timeZone: timezone });
-  const localDate = new Date(localStr);
-  const offsetDiffMs = midnightUtc.getTime() - localDate.getTime();
+  // Calculate local timezone offset at refUtc
+  const tzParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).formatToParts(refUtc);
 
-  const localMidnightDate = new Date(midnightUtc.getTime() + offsetDiffMs);
-  return localMidnightDate.toISOString();
+  const tzYear = parseInt(tzParts.find((p) => p.type === 'year')?.value || year, 10);
+  const tzMonth = parseInt(tzParts.find((p) => p.type === 'month')?.value || month, 10) - 1;
+  const tzDay = parseInt(tzParts.find((p) => p.type === 'day')?.value || day, 10);
+  let tzHour = parseInt(tzParts.find((p) => p.type === 'hour')?.value || '0', 10);
+  if (tzHour === 24) tzHour = 0;
+  const tzMinute = parseInt(tzParts.find((p) => p.type === 'minute')?.value || '0', 10);
+
+  const utcAsLocal = Date.UTC(tzYear, tzMonth, tzDay, tzHour, tzMinute, 0);
+  const offsetMs = utcAsLocal - refUtc.getTime();
+
+  // Target midnight UTC timestamp
+  const targetMidnightUtcMs = Date.UTC(parseInt(year, 10), parseInt(month, 10) - 1, parseInt(day, 10), 0, 0, 0) - offsetMs;
+  return new Date(targetMidnightUtcMs).toISOString();
 }
 
 /**
  * Gets formatted date string (YYYY-MM-DD) for display in target timezone.
- * @param {string} timezone
- * @param {Date} [referenceDate]
+ * @param {string} [timezone='Asia/Kolkata']
+ * @param {Date} [referenceDate=new Date()]
  * @returns {string}
  */
 export function getFormattedToday(timezone = 'Asia/Kolkata', referenceDate = new Date()) {
+  let tz = timezone;
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone: tz });
+  } catch {
+    tz = 'Asia/Kolkata';
+  }
+
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: timezone,
+    timeZone: tz,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -52,9 +85,9 @@ export function getFormattedToday(timezone = 'Asia/Kolkata', referenceDate = new
  * @param {Object} opts
  * @param {string} opts.owner - GitHub repo owner
  * @param {string} opts.repo - GitHub repo name
- * @param {string} opts.username - Target username to filter commit authorship
+ * @param {string} [opts.username] - Target username to filter commit authorship
  * @param {string} [opts.token] - Optional GitHub PAT for private repo access
- * @param {string} [opts.timezone] - Timezone for midnight calculation
+ * @param {string} [opts.timezone='Asia/Kolkata'] - Timezone for midnight calculation
  * @returns {Promise<string>} Formatted summary text
  */
 export async function generateCommitSummary({ owner, repo, username, token, timezone = 'Asia/Kolkata' }) {
@@ -65,7 +98,10 @@ export async function generateCommitSummary({ owner, repo, username, token, time
   const todayStr = getFormattedToday(timezone);
   const sinceISO = getMidnightISO(timezone);
 
-  const url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?since=${encodeURIComponent(sinceISO)}`;
+  let url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?since=${encodeURIComponent(sinceISO)}&per_page=100`;
+  if (username) {
+    url += `&author=${encodeURIComponent(username)}`;
+  }
 
   const headers = {
     Accept: 'application/vnd.github+json',
@@ -86,7 +122,7 @@ export async function generateCommitSummary({ owner, repo, username, token, time
   /** @type {Array<any>} */
   const commits = await response.json();
 
-  // Filter by username if specified
+  // Supplementary client-side filter to verify authorship
   const filteredCommits = username
     ? commits.filter((c) => {
         const authorLogin = c.author?.login?.toLowerCase();

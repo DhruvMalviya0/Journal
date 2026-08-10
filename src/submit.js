@@ -7,13 +7,20 @@ import { buildPrefilledUrl } from './urlBuilder.js';
 
 /**
  * Checks if today is Sunday in the target timezone.
- * @param {string} timezone
- * @param {Date} [referenceDate]
+ * @param {string} [timezone='Asia/Kolkata']
+ * @param {Date} [referenceDate=new Date()]
  * @returns {boolean}
  */
 export function isSunday(timezone = 'Asia/Kolkata', referenceDate = new Date()) {
+  let tz = timezone;
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+  } catch {
+    tz = 'Asia/Kolkata';
+  }
+
   const dayStr = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
+    timeZone: tz,
     weekday: 'short',
   }).format(referenceDate);
   return dayStr === 'Sun';
@@ -76,10 +83,20 @@ async function runScheduledSubmission() {
   console.log(`Navigating to pre-filled Google Form URL...`);
 
   // 6. Launch Headless Browser with Restored Session
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
+  let browser;
+  try {
+    browser = await chromium.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+  } catch (err) {
+    if (err.message.includes('Executable doesn\'t exist') || err.message.includes('npx playwright install')) {
+      console.error('\n❌ ERROR: Playwright Chromium browser binary is missing.');
+      console.error('Please run "npx playwright install chromium" to install browser binaries.\n');
+      process.exit(1);
+    }
+    throw err;
+  }
 
   try {
     const context = await browser.newContext({

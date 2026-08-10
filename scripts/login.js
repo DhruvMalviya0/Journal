@@ -1,6 +1,5 @@
 import { chromium } from 'playwright';
 import readline from 'readline';
-import fs from 'fs';
 import path from 'path';
 import { config } from '../src/config.js';
 
@@ -24,17 +23,28 @@ async function runInteractiveLogin() {
   let targetUrl = 'https://accounts.google.com/';
 
   if (formId) {
-    const cleanedFormId = formId.match(/\/d\/e\/([a-zA-Z0-9_-]+)/)?.[1] || formId;
+    const cleanedFormId = formId.match(/\/d\/(?:e\/)?([a-zA-Z0-9_-]+)/)?.[1] || formId;
     targetUrl = `https://docs.google.com/forms/d/e/${cleanedFormId}/viewform`;
   }
 
   console.log(`Launching visible browser window...`);
   console.log(`Navigating to: ${targetUrl}\n`);
 
-  const browser = await chromium.launch({
-    headless: false,
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
-  });
+  let browser;
+  try {
+    browser = await chromium.launch({
+      headless: false,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+  } catch (err) {
+    if (err.message.includes('Executable doesn\'t exist') || err.message.includes('npx playwright install')) {
+      console.error('\n❌ ERROR: Playwright Chromium browser binary is missing on this machine.');
+      console.error('Please run the following command to download Chromium:\n');
+      console.error('    npx playwright install chromium\n');
+      process.exit(1);
+    }
+    throw err;
+  }
 
   const context = await browser.newContext();
   const page = await context.newPage();
@@ -65,6 +75,6 @@ async function runInteractiveLogin() {
 }
 
 runInteractiveLogin().catch((err) => {
-  console.error('\n❌ Login script error:', err);
+  console.error('\n❌ Login script error:', err.message || err);
   process.exit(1);
 });

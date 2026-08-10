@@ -7,7 +7,8 @@
   "scripts": {
     "login": "node scripts/login.js",
     "start": "node src/submit.js",
-    "test": "node --test"
+    "test": "node --test",
+    "postinstall": "npx playwright install chromium"
   },
   "keywords": [],
   "author": "",
