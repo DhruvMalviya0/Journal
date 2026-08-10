@@ -79,90 +79,19 @@ export function getFormattedToday(timezone = 'Asia/Kolkata', referenceDate = new
 }
 
 /**
- * Fetches commits from GitHub REST API for a repository since midnight today,
- * filtered to a specific author username (or comma-separated list of usernames/emails).
+ * Generates the clean daily journal summary text for key tasks without appending raw GitHub commit logs.
  *
  * @param {Object} opts
  * @param {string} opts.owner - GitHub repo owner
  * @param {string} opts.repo - GitHub repo name
- * @param {string} [opts.username] - Target username or comma-separated list of usernames/emails
- * @param {string} [opts.token] - Optional GitHub PAT for private repo access
- * @param {string} [opts.timezone='Asia/Kolkata'] - Timezone for midnight calculation
- * @returns {Promise<string>} Formatted summary text
+ * @param {string} [opts.username] - Target username
+ * @param {string} [opts.token] - Optional GitHub PAT
+ * @param {string} [opts.timezone='Asia/Kolkata'] - Timezone
+ * @returns {Promise<string>} Clean summary text
  */
 export async function generateCommitSummary({ owner, repo, username, token, timezone = 'Asia/Kolkata' }) {
-  if (!owner || !repo) {
-    throw new Error('GitHub owner and repo must be provided to summarize commits.');
-  }
-
-  const todayStr = getFormattedToday(timezone);
-  const sinceISO = getMidnightISO(timezone);
-
-  let url = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?since=${encodeURIComponent(sinceISO)}&per_page=100`;
-  if (username && !username.includes(',')) {
-    url += `&author=${encodeURIComponent(username.trim())}`;
-  }
-
-  const headers = {
-    Accept: 'application/vnd.github+json',
-    'User-Agent': 'Automated-Coursework-Journal-Submitter',
-  };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(url, { headers });
-
-  if (!response.ok) {
-    const errBody = await response.text();
-    throw new Error(`GitHub API error (${response.status} ${response.statusText}): ${errBody}`);
-  }
-
-  /** @type {Array<any>} */
-  const commits = await response.json();
-
-  // Supplementary client-side filter to verify authorship across multiple logins/emails
-  const filteredCommits = username
-    ? commits.filter((c) => {
-        const authorLogin = c.author?.login?.toLowerCase();
-        const committerLogin = c.committer?.login?.toLowerCase();
-        const commitAuthorName = c.commit?.author?.name?.toLowerCase();
-        const commitAuthorEmail = c.commit?.author?.email?.toLowerCase();
-
-        const targets = username
-          .toLowerCase()
-          .split(',')
-          .map((s) => s.trim())
-          .filter(Boolean);
-
-        return targets.some(
-          (target) =>
-            authorLogin === target ||
-            committerLogin === target ||
-            commitAuthorName === target ||
-            commitAuthorEmail?.includes(target)
-        );
-      })
-    : commits;
-
   const baseSummaryText =
     'Worked on assigned tasks as per the daily plan, including reviewing requirements, implementing planned features/modules, and testing the changes made. Coordinated with the team wherever required and updated task status accordingly.';
 
-  if (!filteredCommits || filteredCommits.length === 0) {
-    return `${baseSummaryText}\n\nGitHub Commit Log (${todayStr}): No commit activity recorded for today.`;
-  }
-
-  const lines = [
-    baseSummaryText,
-    `\nGitHub Commit Log (${todayStr}) - ${filteredCommits.length} commit(s):`,
-  ];
-
-  for (const c of filteredCommits) {
-    const sha = c.sha?.substring(0, 7) || 'code';
-    const message = c.commit?.message ? c.commit.message.split('\n')[0].trim() : 'Updated repository';
-    lines.push(`- [${sha}] ${message}`);
-  }
-
-  return lines.join('\n');
+  return baseSummaryText;
 }
