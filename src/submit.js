@@ -134,6 +134,14 @@ async function runScheduledSubmission() {
 
     // Helper: fill all required fields on the current page section
     async function fillCurrentPage() {
+      // 0. Handle "Continue current draft?" dialog modal if present
+      const continueBtn = page.locator('div[role="dialog"] button:has-text("Continue"), div[role="dialog"] div[role="button"]:has-text("Continue")').first();
+      if (await continueBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
+        console.log('  Dismissing "Continue current draft?" popup modal...');
+        await continueBtn.click({ force: true }).catch(() => {});
+        await page.waitForTimeout(500);
+      }
+
       // 1. Email consent checkbox
       const emailCheckboxes = page.locator('div[role="checkbox"]');
       const cbCount = await emailCheckboxes.count().catch(() => 0);
@@ -213,7 +221,7 @@ async function runScheduledSubmission() {
         }
 
         console.log('Submit button found. Submitting form response...');
-        await submitButton.click();
+        await submitButton.click({ force: true });
         await page.waitForTimeout(3000);
         await takeScreenshot('after-submit');
         break;
@@ -230,7 +238,7 @@ async function runScheduledSubmission() {
 
         await Promise.all([
           page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 8000 }).catch(() => {}),
-          nextButton.click(),
+          nextButton.click({ force: true }),
         ]);
         await page.waitForTimeout(1000);
 
@@ -243,7 +251,7 @@ async function runScheduledSubmission() {
         if (newHeading === currentHeading && newHeading === previousSectionHeading) {
           console.log('Page did not navigate. Re-verifying required fields...');
           await fillCurrentPage();
-          await nextButton.click().catch(() => {});
+          await nextButton.click({ force: true }).catch(() => {});
           await page.waitForTimeout(1500);
         }
         previousSectionHeading = currentHeading;
@@ -259,7 +267,7 @@ async function runScheduledSubmission() {
             process.exit(0);
           }
           console.log(`Clicking primary action button ('${btnText.trim()}')...`);
-          await primaryButton.click();
+          await primaryButton.click({ force: true });
           await page.waitForTimeout(1000);
         } else {
           break;
