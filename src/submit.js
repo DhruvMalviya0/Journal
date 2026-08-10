@@ -49,11 +49,6 @@ async function runScheduledSubmission() {
     process.exit(1);
   }
 
-  if (Object.keys(config.entryMap).length === 0) {
-    console.error('❌ ERROR: ENTRY_ID or ENTRY_MAP environment variable is missing.');
-    process.exit(1);
-  }
-
   if (!config.githubOwner || !config.githubRepo) {
     console.error('❌ ERROR: GH_OWNER and GH_REPO environment variables are required.');
     process.exit(1);
@@ -119,19 +114,70 @@ async function runScheduledSubmission() {
       );
     }
 
-    console.log('Page loaded. Locating Submit button...');
+    console.log('Page loaded. Processing form sections...');
 
-    // Locate Submit button using robust accessible roles and selectors
-    const submitButton = page
-      .getByRole('button', { name: /submit|send|bhejein|submit response/i })
-      .or(page.locator('div[role="button"]:has-text("Submit")'))
-      .or(page.locator('span:has-text("Submit")'))
-      .first();
+    // Explicitly click working day radio option if present on Page 1
+    const workingDayRadio = page.locator('[role="radio"][aria-label*="present"], [role="radio"][aria-label*="working"]').first();
+    if (await workingDayRadio.isVisible({ timeout: 3000 }).catch(() => false)) {
+      console.log('Clicking working day radio choice...');
+      await workingDayRadio.click({ force: true });
+    }
 
-    await submitButton.waitFor({ state: 'visible', timeout: 15000 });
-    console.log('Submit button found. Submitting response...');
+    // Loop through form pages (handles Multi-Page Forms with Next buttons)
+    let maxPages = 5;
+    while (maxPages > 0) {
+      maxPages--;
 
-    await submitButton.click();
+      // Check if Submit button is visible
+      const submitButton = page
+        .getByRole('button', { name: /^submit$|^submit response$|^send$|^bhejein$/i })
+        .or(page.locator('div[role="button"]:has-text("Submit")'))
+        .first();
+
+      if (await submitButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+        console.log('Submit button found. Submitting form response...');
+        await submitButton.click();
+        break;
+      }
+
+      // Check if Next button is visible
+      const nextButton = page
+        .getByRole('button', { name: /^next$|^siguiente$|^aage$/i })
+        .or(page.locator('div[role="button"]:has-text("Next")'))
+        .first();
+
+      if (await nextButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+        console.log('Next button found. Navigating to next section...');
+
+        // Fill any empty required textareas on current page before clicking Next
+        const textareas = page.locator('textarea');
+        const count = await textareas.count();
+        for (let i = 0; i < count; i++) {
+          const area = textareas.nth(i);
+          const val = await area.inputValue();
+          if (!val || val.trim() === '') {
+            await area.fill(journalSummaryText);
+          }
+        }
+
+        await Promise.all([
+          page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {}),
+          nextButton.click(),
+        ]);
+        await page.waitForTimeout(1000);
+      } else {
+        // If neither Next nor Submit button found separately, try first available primary button
+        const primaryButton = page.locator('div[role="button"][jsaction*="click"]').last();
+        if (await primaryButton.isVisible({ timeout: 2000 }).catch(() => false)) {
+          const btnText = await primaryButton.innerText().catch(() => '');
+          console.log(`Clicking primary action button ('${btnText.trim()}')...`);
+          await primaryButton.click();
+          await page.waitForTimeout(1000);
+        } else {
+          break;
+        }
+      }
+    }
 
     // 7. Verify Success Confirmation
     console.log('Waiting for confirmation text...');
