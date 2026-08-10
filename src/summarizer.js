@@ -140,12 +140,15 @@ export async function generateCommitSummary({ owner, repo, username, token, time
       })
     : commits;
 
+  const baseSummaryText = 'Worked on assigned tasks as per the daily plan, including reviewing requirements, implementing planned features/modules, and testing the changes made. Coordinated with the team wherever required and updated task status accordingly.';
+
   if (!filteredCommits || filteredCommits.length === 0) {
-    return `No commit activity recorded for today (${todayStr}).`;
+    return `${baseSummaryText}\n\nGitHub Commit Log (${todayStr}): No commit activity recorded for today.`;
   }
 
   const lines = [
-    `Daily Work Log (${todayStr}) - ${filteredCommits.length} commit(s):`,
+    baseSummaryText,
+    `\nGitHub Commit Log (${todayStr}) - ${filteredCommits.length} commit(s):`,
   ];
 
   for (const c of filteredCommits) {
