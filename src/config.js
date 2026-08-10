@@ -32,8 +32,14 @@ function parseEntryMap() {
 }
 
 export const config = {
+  githubOwner: process.env.GH_OWNER || '',
+  githubRepo: process.env.GH_REPO || '',
+  githubUsername: process.env.GH_USERNAME || '',
+  commitReadToken: process.env.COMMIT_READ_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
+
   formId: process.env.FORM_ID || DEFAULT_FORM_ID,
   entryMap: parseEntryMap(),
+  
   storageStatePath: process.env.STORAGE_STATE_PATH || 'storageState.json',
   timezone: process.env.TIMEZONE || 'Asia/Kolkata',
 
