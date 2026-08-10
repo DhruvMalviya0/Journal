@@ -36,16 +36,8 @@ jobs:
           fi
           echo "$STORAGE_STATE_BASE64" | base64 -d > storageState.json
 
-      - name: Run Journal Submission Script
+      - name: Run Daily Journal Submission Script
         env:
-          FORM_ID: ${{ secrets.FORM_ID }}
-          ENTRY_ID: ${{ secrets.ENTRY_ID }}
-          ENTRY_MAP: ${{ secrets.ENTRY_MAP }}
-          GH_OWNER: ${{ secrets.GH_OWNER }}
-          GH_REPO: ${{ secrets.GH_REPO }}
-          GH_USERNAME: ${{ secrets.GH_USERNAME }}
-          COMMIT_READ_TOKEN: ${{ secrets.COMMIT_READ_TOKEN }}
-          TIMEZONE: ${{ secrets.TIMEZONE }}
           DISABLE_SUBMIT: ${{ secrets.DISABLE_SUBMIT }}
           DRY_RUN: ${{ secrets.DRY_RUN }}
         run: npm start
