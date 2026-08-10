@@ -2,8 +2,8 @@ name: Daily Coursework Journal Submission
 
 on:
   schedule:
-    # 4:00 PM IST (16:00 IST) = 10:30 AM UTC
-    - cron: '30 10 * * *'
+    # 4:00 PM IST (16:00 IST) = 10:30 AM UTC, Monday to Friday (1-5)
+    - cron: '30 10 * * 1-5'
   workflow_dispatch:
 
 jobs:
