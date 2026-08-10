@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import readline from 'readline';
 import path from 'path';
+import fs from 'fs';
 import { config } from '../src/config.js';
 
 async function promptEnter(query) {
@@ -53,12 +54,73 @@ async function runInteractiveLogin() {
 
   console.log('----------------------------------------------------------------------');
   console.log('ACTION REQUIRED:');
-  console.log('Please sign in to your verified coursework Google account in the browser window.');
-  console.log('Ensure you can view the form with your verified email displayed.');
+  console.log('1. Sign in to your verified coursework Google account in the browser window.');
+  console.log('2. Ensure you can view the full form with your verified email displayed.');
   console.log('----------------------------------------------------------------------\n');
 
-  await promptEnter('--> Press [ENTER] in this terminal AFTER you have successfully signed in: ');
+  await promptEnter('--> Press [ENTER] in this terminal AFTER you have successfully signed in & loaded the form: ');
 
+  // Scan form DOM for entry IDs & field names
+  console.log('\nScanning form for entry IDs...');
+  const detectedFields = await page.evaluate(() => {
+    const fields = [];
+    const seen = new Set();
+
+    // 1. Direct input/textarea elements
+    const inputs = document.querySelectorAll('[name^="entry."]');
+    inputs.forEach((el) => {
+      const name = el.getAttribute('name');
+      if (name && !seen.has(name)) {
+        seen.add(name);
+        const container = el.closest('[role="listitem"]') || el.closest('.geSsid') || el.closest('.QrRbSc');
+        const titleEl = container ? container.querySelector('[role="heading"], .M7eMe, .ss-q-title') : null;
+        fields.push({
+          entryId: name,
+          title: titleEl ? titleEl.textContent.replace(/\s*\*$/, '').trim() : 'Form Field',
+          type: el.tagName.toLowerCase(),
+        });
+      }
+    });
+
+    // 2. Data params scanner for complex inputs (radios, dropdowns, etc.)
+    const items = document.querySelectorAll('[data-params]');
+    items.forEach((item) => {
+      const paramsStr = item.getAttribute('data-params');
+      if (paramsStr) {
+        const matches = paramsStr.match(/\[(\d{7,12}),/g);
+        if (matches) {
+          matches.forEach((m) => {
+            const num = m.match(/\d+/)?.[0];
+            if (num) {
+              const entryId = `entry.${num}`;
+              if (!seen.has(entryId)) {
+                seen.add(entryId);
+                const titleEl = item.querySelector('[role="heading"], .M7eMe, .ss-q-title');
+                fields.push({
+                  entryId,
+                  title: titleEl ? titleEl.textContent.replace(/\s*\*$/, '').trim() : 'Form Question',
+                  type: 'data-params',
+                });
+              }
+            }
+          });
+        }
+      }
+    });
+
+    return fields;
+  });
+
+  if (detectedFields.length > 0) {
+    console.log('\n🔎 Detected Google Form Fields:');
+    detectedFields.forEach((f, idx) => {
+      console.log(`   [${idx + 1}] ID: ${f.entryId}  | Question: "${f.title}"`);
+    });
+  } else {
+    console.log('\n⚠️ Could not automatically detect entry IDs from DOM. You can find them via "Get pre-filled link".');
+  }
+
+  // Save session state
   const storagePath = path.resolve(config.storageStatePath || 'storageState.json');
   await context.storageState({ path: storagePath });
 
