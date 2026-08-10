@@ -122,6 +122,10 @@ async function runInteractiveLogin() {
 
   // Save session state
   const storagePath = path.resolve(config.storageStatePath || 'storageState.json');
+  const storageDir = path.dirname(storagePath);
+  if (!fs.existsSync(storageDir)) {
+    fs.mkdirSync(storageDir, { recursive: true });
+  }
   await context.storageState({ path: storagePath });
 
   console.log(`\n✅ Session storage state successfully saved to: ${storagePath}`);

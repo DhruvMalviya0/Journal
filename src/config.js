@@ -16,36 +16,49 @@ function parseEntryMap() {
   if (envVal) {
     envVal = envVal.trim();
     if ((envVal.startsWith("'") && envVal.endsWith("'")) || (envVal.startsWith('"') && envVal.endsWith('"'))) {
-      envVal = envVal.substring(1, envVal.length - 1);
+      envVal = envVal.substring(1, envVal.length - 1).trim();
     }
+    if (!envVal) return DEFAULT_ANSWERS;
+
     try {
       const parsed = JSON.parse(envVal);
-      const result = {};
-      for (const [key, val] of Object.entries(parsed)) {
-        const entryKey = key.startsWith('entry.') ? key : `entry.${key}`;
-        result[entryKey] = val;
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        const result = { ...DEFAULT_ANSWERS };
+        for (const [key, val] of Object.entries(parsed)) {
+          const entryKey = key.startsWith('entry.') ? key : `entry.${key}`;
+          result[entryKey] = val;
+        }
+        return result;
       }
-      return result;
-    } catch {}
+      if (typeof parsed === 'string') {
+        return parsed.startsWith('entry.') ? parsed : `entry.${parsed}`;
+      }
+    } catch {
+      if (/^(?:entry\.)?\d+$/.test(envVal)) {
+        return envVal.startsWith('entry.') ? envVal : `entry.${envVal}`;
+      }
+    }
   }
   return DEFAULT_ANSWERS;
 }
 
+const repoParts = process.env.GITHUB_REPOSITORY ? process.env.GITHUB_REPOSITORY.split('/') : [];
+
 export const config = {
-  githubOwner: process.env.GH_OWNER || '',
-  githubRepo: process.env.GH_REPO || '',
-  githubUsername: process.env.GH_USERNAME || '',
+  githubOwner: process.env.GH_OWNER || process.env.GITHUB_OWNER || repoParts[0] || '',
+  githubRepo: process.env.GH_REPO || process.env.GITHUB_REPO || repoParts[1] || '',
+  githubUsername: process.env.GH_USERNAME || process.env.GITHUB_USERNAME || '',
   commitReadToken: process.env.COMMIT_READ_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '',
 
-  formId: process.env.FORM_ID || DEFAULT_FORM_ID,
+  formId: (process.env.FORM_ID || DEFAULT_FORM_ID).trim(),
   entryMap: parseEntryMap(),
   
   storageStatePath: process.env.STORAGE_STATE_PATH || 'storageState.json',
   timezone: process.env.TIMEZONE || 'Asia/Kolkata',
 
   dryRun:
-    process.env.DRY_RUN === 'true' ||
-    process.env.DISABLE_SUBMIT === 'true' ||
+    ['true', '1', 'yes'].includes(String(process.env.DRY_RUN || '').toLowerCase()) ||
+    ['true', '1', 'yes'].includes(String(process.env.DISABLE_SUBMIT || '').toLowerCase()) ||
     process.argv.includes('--dry-run') ||
     process.argv.includes('--disable-submit'),
 };

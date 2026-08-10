@@ -7,6 +7,7 @@
  * @returns {string} ISO timestamp
  */
 export function getMidnightISO(timezone = 'Asia/Kolkata', referenceDate = new Date()) {
+  const refDate = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
   let tz = timezone;
   try {
     new Intl.DateTimeFormat('en-US', { timeZone: tz });
@@ -20,7 +21,7 @@ export function getMidnightISO(timezone = 'Asia/Kolkata', referenceDate = new Da
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).formatToParts(referenceDate);
+  }).formatToParts(refDate);
 
   const month = parts.find((p) => p.type === 'month')?.value || '01';
   const day = parts.find((p) => p.type === 'day')?.value || '01';
@@ -63,6 +64,7 @@ export function getMidnightISO(timezone = 'Asia/Kolkata', referenceDate = new Da
  * @returns {string}
  */
 export function getFormattedToday(timezone = 'Asia/Kolkata', referenceDate = new Date()) {
+  const refDate = referenceDate instanceof Date && !isNaN(referenceDate.getTime()) ? referenceDate : new Date();
   let tz = timezone;
   try {
     new Intl.DateTimeFormat('en-CA', { timeZone: tz });
@@ -75,23 +77,71 @@ export function getFormattedToday(timezone = 'Asia/Kolkata', referenceDate = new
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(referenceDate);
+  }).format(refDate);
 }
 
 /**
- * Generates the clean daily journal summary text for key tasks without appending raw GitHub commit logs.
+ * Generates the clean daily journal summary text by fetching GitHub commits if configured,
+ * or returning the default coursework journal summary text.
  *
- * @param {Object} opts
- * @param {string} opts.owner - GitHub repo owner
- * @param {string} opts.repo - GitHub repo name
+ * @param {Object} [opts]
+ * @param {string} [opts.owner] - GitHub repo owner
+ * @param {string} [opts.repo] - GitHub repo name
  * @param {string} [opts.username] - Target username
  * @param {string} [opts.token] - Optional GitHub PAT
  * @param {string} [opts.timezone='Asia/Kolkata'] - Timezone
  * @returns {Promise<string>} Clean summary text
  */
-export async function generateCommitSummary({ owner, repo, username, token, timezone = 'Asia/Kolkata' }) {
-  const baseSummaryText =
+export async function generateCommitSummary(opts = {}) {
+  const defaultSummaryText =
     'Worked on assigned tasks as per the daily plan, including reviewing requirements, implementing planned features/modules, and testing the changes made. Coordinated with the team wherever required and updated task status accordingly.';
 
-  return baseSummaryText;
+  const owner = opts.owner || process.env.GH_OWNER || process.env.GITHUB_OWNER || process.env.GITHUB_REPOSITORY?.split('/')[0];
+  const repo = opts.repo || process.env.GH_REPO || process.env.GITHUB_REPO || process.env.GITHUB_REPOSITORY?.split('/')[1];
+  const username = opts.username || process.env.GH_USERNAME || process.env.GITHUB_USERNAME;
+  const token = opts.token || process.env.COMMIT_READ_TOKEN || process.env.GH_TOKEN || process.env.GITHUB_TOKEN;
+  const timezone = opts.timezone || 'Asia/Kolkata';
+
+  if (!owner || !repo) {
+    return defaultSummaryText;
+  }
+
+  try {
+    const since = getMidnightISO(timezone);
+    let url = `https://api.github.com/repos/${owner}/${repo}/commits?since=${encodeURIComponent(since)}`;
+    if (username) {
+      url += `&author=${encodeURIComponent(username)}`;
+    }
+
+    const headers = {
+      'User-Agent': 'Automated-Journal-Bot',
+      'Accept': 'application/vnd.github.v3+json',
+    };
+    if (token) {
+      headers['Authorization'] = `token ${token}`;
+    }
+
+    const response = await fetch(url, { headers, signal: AbortSignal.timeout(10000) });
+    if (!response.ok) {
+      return defaultSummaryText;
+    }
+
+    const commits = await response.json();
+    if (!Array.isArray(commits) || commits.length === 0) {
+      return defaultSummaryText;
+    }
+
+    const commitMessages = commits
+      .map((c) => c.commit?.message?.split('\n')[0]?.trim())
+      .filter(Boolean);
+
+    if (commitMessages.length === 0) {
+      return defaultSummaryText;
+    }
+
+    const uniqueMessages = [...new Set(commitMessages)];
+    return `Worked on daily tasks: ${uniqueMessages.join('; ')}. Tested changes and updated codebase.`;
+  } catch {
+    return defaultSummaryText;
+  }
 }

@@ -15,14 +15,25 @@ if (!fs.existsSync(storagePath)) {
   process.exit(1);
 }
 
-const journalText = 'Diagnostic run - test text';
 const prefilledUrl = buildPrefilledUrl({
   formId: config.formId,
-  entryMap: config.entryMap,
-  journalSummaryText: journalText,
+  entryMap: {
+    ...config.entryMap,
+    'entry.32162408': 'Diagnostic run - test text',
+  },
 });
 
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+let browser;
+try {
+  browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+} catch (err) {
+  if (err.message.includes('Executable doesn\'t exist') || err.message.includes('npx playwright install')) {
+    console.error('\n❌ ERROR: Playwright Chromium browser binary is missing.');
+    console.error('Please run "npx playwright install chromium" to install browser binaries.\n');
+    process.exit(1);
+  }
+  throw err;
+}
 const context = await browser.newContext({ storageState: storagePath });
 const page = await context.newPage();
 
