@@ -120,26 +120,79 @@ async function runScheduledSubmission() {
 
     console.log('Page loaded. Processing form sections...');
 
-    // Explicitly click working day radio option if present on Page 1
-    const workingDayRadio = page.locator('[role="radio"][aria-label*="present"], [role="radio"][aria-label*="working"]').first();
-    if (await workingDayRadio.isVisible({ timeout: 3000 }).catch(() => false)) {
-      console.log('Clicking working day radio choice...');
-      await workingDayRadio.click({ force: true });
+    // Ensure screenshots directory exists
+    const screenshotsDir = path.resolve('screenshots');
+    if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir);
+    let screenshotIndex = 0;
+
+    async function takeScreenshot(label) {
+      screenshotIndex++;
+      const filename = path.join(screenshotsDir, `page-${String(screenshotIndex).padStart(2, '0')}-${label}.png`);
+      await page.screenshot({ path: filename, fullPage: true });
+      console.log(`  📸 Screenshot saved: ${filename}`);
     }
 
+    // Helper: fill all required fields on the current page
+    async function fillCurrentPage() {
+      // 1. Email consent checkbox — Google Forms renders this as div[role="checkbox"], not input
+      const emailCheckbox = page.locator('div[role="checkbox"]').first();
+      if (await emailCheckbox.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const ariaChecked = await emailCheckbox.getAttribute('aria-checked').catch(() => 'false');
+        if (ariaChecked !== 'true') {
+          console.log('Checking email consent checkbox...');
+          await emailCheckbox.click({ force: true });
+          await page.waitForTimeout(500);
+        }
+      }
+
+      // 2. Working day radio option
+      const workingDayRadio = page.locator('[role="radio"][aria-label*="present"], [role="radio"][aria-label*="working"]').first();
+      if (await workingDayRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
+        const selected = await workingDayRadio.getAttribute('aria-checked').catch(() => 'false');
+        if (selected !== 'true') {
+          console.log('Clicking working day radio choice...');
+          await workingDayRadio.click({ force: true });
+          await page.waitForTimeout(500);
+        }
+      }
+
+      // 3. Fill any empty required textareas
+      const textareas = page.locator('textarea');
+      const count = await textareas.count();
+      for (let i = 0; i < count; i++) {
+        const area = textareas.nth(i);
+        const val = await area.inputValue().catch(() => '');
+        if (!val || val.trim() === '') {
+          await area.fill(journalSummaryText);
+        }
+      }
+    }
+
+    // Fill page 1 fields on initial load
+    await fillCurrentPage();
+    await takeScreenshot('initial-load');
+
     // Loop through form pages (handles Multi-Page Forms with Next buttons)
-    let maxPages = 5;
+    let maxPages = 15;
+    let pageCount = 0;
     while (maxPages > 0) {
       maxPages--;
+      pageCount++;
+      console.log(`Processing form page ${pageCount}...`);
+
+      // Loop iteration: take screenshot of current page state
+      await takeScreenshot(`section-${pageCount}`);
 
       // Check if Submit button is visible
       const submitButton = page
-        .getByRole('button', { name: /^submit$|^submit response$|^send$|^bhejein$/i })
+        .getByRole('button', { name: /^submit$|^submit response$|^send$|^bhejein$|^सबमिट करें$|^जमा करें$/i })
         .or(page.locator('div[role="button"]:has-text("Submit")'))
+        .or(page.locator('div[role="button"]:has-text("submit")'))
         .first();
 
       if (await submitButton.isVisible({ timeout: 2000 }).catch(() => false)) {
         if (config.dryRun) {
+          await takeScreenshot('dryrun-submit-page');
           console.log('\n🔒 [DRY RUN / FORM FILL DISABLED] Submit button located. Form was filled & validated successfully!');
           console.log('Skipping actual form submission as DRY_RUN / DISABLE_SUBMIT is enabled.\n');
           await browser.close();
@@ -148,6 +201,8 @@ async function runScheduledSubmission() {
 
         console.log('Submit button found. Submitting form response...');
         await submitButton.click();
+        await page.waitForTimeout(3000);
+        await takeScreenshot('after-submit');
         break;
       }
 
@@ -160,22 +215,14 @@ async function runScheduledSubmission() {
       if (await nextButton.isVisible({ timeout: 2000 }).catch(() => false)) {
         console.log('Next button found. Navigating to next section...');
 
-        // Fill any empty required textareas on current page before clicking Next
-        const textareas = page.locator('textarea');
-        const count = await textareas.count();
-        for (let i = 0; i < count; i++) {
-          const area = textareas.nth(i);
-          const val = await area.inputValue();
-          if (!val || val.trim() === '') {
-            await area.fill(journalSummaryText);
-          }
-        }
-
         await Promise.all([
           page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 10000 }).catch(() => {}),
           nextButton.click(),
         ]);
         await page.waitForTimeout(1000);
+
+        // Fill any required fields on the new page
+        await fillCurrentPage();
       } else {
         // If neither Next nor Submit button found separately, try first available primary button
         const primaryButton = page.locator('div[role="button"][jsaction*="click"]').last();
@@ -197,6 +244,7 @@ async function runScheduledSubmission() {
     }
 
     if (config.dryRun) {
+      await takeScreenshot('dryrun-final');
       console.log('\n🔒 [DRY RUN / FORM FILL DISABLED] Form process completed in Dry Run mode.');
       await browser.close();
       process.exit(0);
@@ -204,19 +252,42 @@ async function runScheduledSubmission() {
 
     // 7. Verify Success Confirmation
     console.log('Waiting for confirmation text...');
+    await page.waitForTimeout(2000);
+
     const confirmationTextLocator = page
-      .getByText(/recorded|submitted|response has been recorded|thank you/i)
+      .getByText(/recorded|submitted|response has been recorded|thank you|your response/i)
       .or(page.locator('.freebirdFormviewFunctioningresponseConfirmationText'))
       .first();
 
-    await confirmationTextLocator.waitFor({ state: 'visible', timeout: 15000 });
+    const confirmed = await confirmationTextLocator.isVisible({ timeout: 15000 }).catch(() => false);
 
-    console.log('\n🎉 SUCCESS: Journal entry successfully submitted to Google Form with verified email session!');
+    if (confirmed) {
+      await takeScreenshot('confirmation');
+      console.log('\n🎉 SUCCESS: Journal entry successfully submitted to Google Form with verified email session!');
+    } else {
+      const finalUrl = page.url();
+      if (finalUrl.includes('accounts.google.com')) {
+        throw new Error('Session expired during submission. Please run "npm run login" again.');
+      }
+      // Take a screenshot so the user can verify manually
+      await page.screenshot({ path: 'submit-result.png', fullPage: true });
+      console.log('\n✅ Form submitted. Could not detect confirmation text — check submit-result.png to verify.');
+    }
     await browser.close();
     process.exit(0);
   } catch (error) {
     console.error('\n❌ SUBMISSION FAILED:', error.message);
     if (browser) {
+      // Try to grab a failure screenshot if page is still open
+      try {
+        const pages = browser.contexts()?.[0]?.pages();
+        if (pages && pages.length > 0) {
+          const screenshotsDir = path.resolve('screenshots');
+          if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir);
+          await pages[0].screenshot({ path: path.join(screenshotsDir, 'error-state.png'), fullPage: true });
+          console.error('  📸 Error screenshot saved: screenshots/error-state.png');
+        }
+      } catch {}
       await browser.close();
     }
     process.exit(1);

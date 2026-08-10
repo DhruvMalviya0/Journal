@@ -1,0 +1,69 @@
+/**
+ * Diagnostic script — loads the form with your saved session and dumps
+ * the HTML around the Email checkbox so we know the exact selectors to use.
+ */
+import { chromium } from 'playwright';
+import fs from 'fs';
+import path from 'path';
+import { config } from '../src/config.js';
+import { buildPrefilledUrl } from '../src/urlBuilder.js';
+import { generateCommitSummary } from '../src/summarizer.js';
+
+const storagePath = path.resolve(config.storageStatePath);
+if (!fs.existsSync(storagePath)) {
+  console.error('storageState.json not found. Run npm run login first.');
+  process.exit(1);
+}
+
+const journalText = 'Diagnostic run - test text';
+const prefilledUrl = buildPrefilledUrl({
+  formId: config.formId,
+  entryMap: config.entryMap,
+  journalSummaryText: journalText,
+});
+
+const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+const context = await browser.newContext({ storageState: storagePath });
+const page = await context.newPage();
+
+await page.goto(prefilledUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+await page.waitForTimeout(2000);
+
+// Dump the HTML of the Email question block
+const emailBlockHtml = await page.evaluate(() => {
+  // Find element containing the word "email" in its text
+  const allDivs = Array.from(document.querySelectorAll('[role="listitem"], .Qr7Oae, .freebirdFormviewerViewItemsItemItem'));
+  for (const div of allDivs) {
+    if (div.textContent?.toLowerCase().includes('record') && div.textContent?.toLowerCase().includes('email')) {
+      return div.outerHTML.substring(0, 3000);
+    }
+  }
+  // fallback — grab first 2000 chars of body
+  return document.body.innerHTML.substring(0, 2000);
+});
+
+console.log('\n=== EMAIL BLOCK HTML ===\n');
+console.log(emailBlockHtml);
+console.log('\n========================\n');
+
+// Also list ALL checkboxes and their roles/classes
+const checkboxInfo = await page.evaluate(() => {
+  const results = [];
+
+  // Real checkboxes
+  document.querySelectorAll('input[type="checkbox"]').forEach((el, i) => {
+    results.push({ index: i, tag: 'input[checkbox]', id: el.id, name: el.name, class: el.className, checked: el.checked });
+  });
+
+  // ARIA checkboxes
+  document.querySelectorAll('[role="checkbox"]').forEach((el, i) => {
+    results.push({ index: i, tag: 'div[role=checkbox]', ariaChecked: el.getAttribute('aria-checked'), class: el.className, text: el.textContent?.substring(0, 80) });
+  });
+
+  return results;
+});
+
+console.log('=== CHECKBOX ELEMENTS FOUND ===');
+console.log(JSON.stringify(checkboxInfo, null, 2));
+
+await browser.close();
