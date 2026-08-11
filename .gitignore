@@ -5,6 +5,7 @@ node_modules/
 .env
 .env.local
 storageState.json
+.last_submission.json
 
 # Playwright / Testing
 test-results/

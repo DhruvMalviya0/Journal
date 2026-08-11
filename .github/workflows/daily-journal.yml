@@ -37,6 +37,18 @@ jobs:
           echo "$STORAGE_STATE_BASE64" | tr -d '\r\n' | base64 -d > storageState.json
           echo "storageState.json restored successfully."
 
+      - name: Get current date in target timezone
+        id: date
+        run: echo "today=$(node -e 'import("./src/summarizer.js").then(m => console.log(m.getFormattedToday(process.env.TIMEZONE || "Asia/Kolkata")))')" >> $GITHUB_OUTPUT
+        env:
+          TIMEZONE: ${{ secrets.TIMEZONE }}
+
+      - name: Restore daily submission state from cache
+        uses: actions/cache/restore@v4
+        with:
+          path: .last_submission.json
+          key: journal-submitted-${{ steps.date.outputs.today }}
+
       - name: Run Journal Submission Script
         env:
           FORM_ID: ${{ secrets.FORM_ID }}
@@ -50,3 +62,10 @@ jobs:
           DISABLE_SUBMIT: "false"
           DRY_RUN: "false"
         run: npm start
+
+      - name: Save daily submission state to cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .last_submission.json
+          key: journal-submitted-${{ steps.date.outputs.today }}

@@ -1,18 +1,19 @@
 {
   "name": "automated-coursework-journal",
   "version": "1.0.0",
-  "description": "Automated daily coursework journal submitter for Google Forms using GitHub commit activity and authenticated Playwright session.",
+  "description": "Automated daily coursework journal submitter for Google Forms using authenticated Playwright session.",
   "type": "module",
   "main": "src/submit.js",
   "scripts": {
     "login": "node scripts/login.js",
+    "diagnose": "node scripts/diagnose-form.js",
     "start": "node src/submit.js",
     "test": "node --test",
     "postinstall": "npx playwright install chromium"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Raph1710/Journal-Autofill.git"
+    "url": "git+https://github.com/Gaurav-205/Journal.git"
   },
   "keywords": [
     "playwright",

@@ -39,7 +39,7 @@ async function runInteractiveLogin() {
     });
   } catch (err) {
     if (err.message.includes('Executable doesn\'t exist') || err.message.includes('npx playwright install')) {
-      console.error('\n❌ ERROR: Playwright Chromium browser binary is missing on this machine.');
+      console.error('\n[ERROR] Playwright Chromium browser binary is missing on this machine.');
       console.error('Please run the following command to download Chromium:\n');
       console.error('    npx playwright install chromium\n');
       process.exit(1);
@@ -112,12 +112,12 @@ async function runInteractiveLogin() {
   });
 
   if (detectedFields.length > 0) {
-    console.log('\n🔎 Detected Google Form Fields:');
+    console.log('\n[INFO] Detected Google Form Fields:');
     detectedFields.forEach((f, idx) => {
       console.log(`   [${idx + 1}] ID: ${f.entryId}  | Question: "${f.title}"`);
     });
   } else {
-    console.log('\n⚠️ Could not automatically detect entry IDs from DOM. You can find them via "Get pre-filled link".');
+    console.log('\n[WARN] Could not automatically detect entry IDs from DOM. You can find them via "Get pre-filled link".');
   }
 
   // Save session state
@@ -128,7 +128,7 @@ async function runInteractiveLogin() {
   }
   await context.storageState({ path: storagePath });
 
-  console.log(`\n✅ Session storage state successfully saved to: ${storagePath}`);
+  console.log(`\n[SUCCESS] Session storage state successfully saved to: ${storagePath}`);
 
   await browser.close();
 
@@ -141,6 +141,6 @@ async function runInteractiveLogin() {
 }
 
 runInteractiveLogin().catch((err) => {
-  console.error('\n❌ Login script error:', err.message || err);
+  console.error('\n[ERROR] Login script error:', err.message || err);
   process.exit(1);
 });

@@ -1,4 +1,4 @@
-# 🔒 Security Policy
+# Security Policy
 
 ## Supported Versions
 
@@ -6,12 +6,13 @@ We actively release security updates and bug fixes for the following versions of
 
 | Version | Supported |
 | :--- | :--- |
+| 1.1.x | Yes |
 | 1.0.x | Yes |
 | < 1.0.0 | No |
 
 ---
 
-## 🚨 Reporting a Vulnerability
+## Reporting a Vulnerability
 
 If you discover a security vulnerability within this project (including session handling bugs, accidental secret exposure, or dependency vulnerabilities), please **do not** open a public GitHub issue.
 
@@ -23,7 +24,7 @@ Instead, please report the vulnerability directly to the project maintainers:
 
 ---
 
-## 🔒 Security Best Practices & Safeguards
+## Security Best Practices & Safeguards
 
 1. **Session Cookies (`storageState.json`)**:
    - `storageState.json` contains sensitive Google session authentication tokens.

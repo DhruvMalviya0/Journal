@@ -1,37 +1,65 @@
-# ⚡ Automated Coursework Journal Submission
+# Automated Coursework Journal Submission
 
-[![Node.js CI](https://img.shields.io/badge/Node.js-v20%2B-brightgreen.svg)](https://nodejs.org)
-[![Playwright](https://img.shields.io/badge/Playwright-Chromium-blue.svg)](https://playwright.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![GitHub Actions](https://img.shields.io/badge/GitHub%20Actions-Automated-purple.svg)](.github/workflows/daily-journal.yml)
+<p align="center">
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-v20%2B-026e00.svg?style=for-the-badge&logo=node.js&logoColor=white" alt="Node.js" /></a>
+  <a href="https://playwright.dev"><img src="https://img.shields.io/badge/Playwright-Chromium-45ba4b.svg?style=for-the-badge&logo=playwright&logoColor=white" alt="Playwright" /></a>
+  <a href=".github/workflows/daily-journal.yml"><img src="https://img.shields.io/badge/GitHub_Actions-Automated-2088FF.svg?style=for-the-badge&logo=github-actions&logoColor=white" alt="GitHub Actions" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge" alt="License" /></a>
+</p>
 
-An automated daily coursework journal submission engine built with **Node.js (ES Modules)** and **Playwright Chromium**. It fetches your daily GitHub commit activity, formats daily journal responses, populates multi-page Google Forms using authenticated session persistence (`storageState.json`), and executes scheduled submissions via **GitHub Actions**.
-
----
-
-## 📚 Open Source Documentation
-
-- 🤝 **[Contributing Guidelines](CONTRIBUTING.md)** — Guide on reporting issues, proposing features, and submitting PRs.
-- 📜 **[Code of Conduct](CODE_OF_CONDUCT.md)** — Contributor Covenant v2.1 standards for community participation.
-- 🔒 **[Security Policy](SECURITY.md)** — Vulnerability disclosure process and security best practices.
-- ⚡ **[System Architecture & Directives](AGENTS.md)** — Exhaustive AI agent and developer technical directives.
-- 📝 **[Changelog](CHANGELOG.md)** — Version release notes and revision history.
-- 📄 **[MIT License](LICENSE)** — Open-source license terms.
+An automated daily coursework journal submission engine built with **Node.js (ES Modules)** and **Playwright Chromium**. It populates multi-page Google Forms using authenticated session persistence (`storageState.json`) and executes scheduled submissions via **GitHub Actions**.
 
 ---
 
-## 🌟 Key Features
+## Documentation Hub
 
-- 🤖 **Automated Daily Journaling**: Automatically formats daily coursework journal responses using default answers or optional live GitHub commit history.
-- 🔐 **Session Persistence**: Restores Google account session cookies via Playwright `storageState.json`, bypassing login prompts and preserving verified email consent.
-- ⚡ **Multi-Page Form Navigation**: Automatically handles Google Form section transitions (`Next`), radio selections ("Present / Working Day"), draft popups ("Continue current draft?"), and mandatory email consent checkboxes.
-- 🔒 **Dry-Run Mode**: Includes safety controls (`DRY_RUN=true` / `DISABLE_SUBMIT=true`) to test form filling without submitting actual responses.
-- 📅 **Schedule & Sunday Skip**: Configured for scheduled GitHub Actions cron jobs (Mon–Fri at 16:00 IST / 10:30 UTC), automatically skipping Sunday executions.
-- 📸 **Debug Screenshot Artifacts**: Automatically captures page-by-page progress screenshots to simplify DOM element troubleshooting.
+| Document | Purpose |
+| :--- | :--- |
+| [Contributing Guidelines](CONTRIBUTING.md) | Guide on reporting issues, proposing features, and submitting pull requests. |
+| [Code of Conduct](CODE_OF_CONDUCT.md) | Contributor Covenant v2.1 community standards. |
+| [Security Policy](SECURITY.md) | Vulnerability reporting procedure and security safeguards. |
+| [System Architecture](AGENTS.md) | Comprehensive AI agent directives and core architecture reference. |
+| [Changelog](CHANGELOG.md) | Release notes and version history. |
+| [License](LICENSE) | Open-source software license terms. |
 
 ---
 
-## 📁 Project Structure
+## Personal Production Deployment (Fork & Automate Guide)
+
+If you are not an admin of this repository, you can deploy your own **100% automated personal submission engine** in production on GitHub Actions for free in 5 steps:
+
+1. **Fork this repository**: Click the **Fork** button at top right to copy this repository to your GitHub account (`github.com/YOUR_USERNAME/Journal`).
+2. **Enable GitHub Actions**: In your forked repository, go to **Actions** -> click **"I understand my workflows, go ahead and enable them"**.
+3. **Generate Session File Locally**:
+   - Clone your fork: `git clone https://github.com/YOUR_USERNAME/Journal.git && cd Journal`
+   - Run `npm install` and configure your `FORM_ID` in `.env`
+   - Run `npm run login`, sign in to Google, and press **[ENTER]** in terminal to generate `storageState.json`.
+4. **Base64 Encode Session File**:
+   - **PowerShell (Windows)**: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("storageState.json"))`
+   - **macOS / Linux**: `base64 -w 0 storageState.json`
+5. **Add Repository Secret**:
+   - In your fork on GitHub, go to **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**.
+   - Create secret `STORAGE_STATE_BASE64` and paste your base64 string.
+   - *(Optional Secrets)*: `FORM_ID`, `GH_USERNAME`, `GH_TOKEN`, `TIMEZONE`.
+
+> [!TIP]
+> **Fully Automated Execution**: Once configured, your fork's GitHub Actions workflow runs on schedule every Monday-Friday at 4:00 PM IST (10:30 UTC) in production without any manual input required! You can also click **Actions** -> **Daily Coursework Journal Submission** -> **Run workflow** to trigger manual submissions anytime.
+
+---
+
+## Key Features
+
+- **Automated Daily Journaling**: Automatically populates daily coursework journal responses using configured default answers.
+- **Session Persistence**: Restores Google account session cookies via Playwright `storageState.json`, bypassing login prompts and preserving verified email consent.
+- **Once-Per-Day Guard**: Tracks daily submission state via `.last_submission.json` and GitHub Actions cache to prevent duplicate form submissions if the job executes multiple times a day. Pass `--force` or `ALLOW_MULTIPLE_SUBMISSIONS=true` to override.
+- **Multi-Page Form Navigation**: Automatically handles Google Form section transitions (`Next`), radio selections ("Present / Working Day"), draft popups ("Continue current draft?"), and mandatory email consent checkboxes.
+- **Dry-Run Safety Controls**: Includes safety controls (`DRY_RUN=true` / `DISABLE_SUBMIT=true`) to validate form filling without triggering actual submissions.
+- **Schedule & Sunday Skip**: Configured for scheduled GitHub Actions cron jobs (Mon–Fri at 16:00 IST / 10:30 UTC), automatically skipping Sunday executions.
+- **Debug Screenshots**: Automatically captures page-by-page progress screenshots to simplify DOM element troubleshooting.
+
+---
+
+## Project Structure
 
 ```
 .
@@ -44,7 +72,7 @@ An automated daily coursework journal submission engine built with **Node.js (ES
 │   ├── config.js             # Environment variables & default entry map loader
 │   ├── summarizer.js         # GitHub REST API commit summarizer module
 │   ├── urlBuilder.js         # Pre-filled Google Form URL builder
-│   └── submit.js             # Headless Playwright runner & Sunday check
+│   └── submit.js             # Headless Playwright runner & idempotency guard
 ├── test/
 │   └── check.js              # Native Node.js test runner suite (node --test)
 ├── .env.example              # Template environment variables file
@@ -61,7 +89,7 @@ An automated daily coursework journal submission engine built with **Node.js (ES
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Prerequisites
 
@@ -73,8 +101,8 @@ An automated daily coursework journal submission engine built with **Node.js (ES
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/Raph1710/Journal-Autofill.git
-cd Journal-Autofill
+git clone https://github.com/Gaurav-205/Journal.git
+cd Journal
 npm install
 ```
 
@@ -108,7 +136,7 @@ DRY_RUN=true
 
 ---
 
-## 🔑 One-Time Authentication Setup
+## One-Time Authentication Setup
 
 Google Forms requiring user sign-in cannot be filled anonymously. Follow these steps once on your local machine to save your authenticated session cookies:
 
@@ -122,11 +150,12 @@ Google Forms requiring user sign-in cannot be filled anonymously. Follow these s
 5. Return to your terminal and press **[ENTER]**.
 6. The script will inspect form fields, output entry IDs, and save session cookies to `storageState.json`.
 
-> ⚠️ **SECURITY WARNING**: Never commit `storageState.json` to git! It contains active session cookies. It is strictly excluded in `.gitignore`.
+> [!CAUTION]
+> **Security Warning**: Never commit `storageState.json` to git or version control! It contains active Google account session cookies. It is strictly excluded in `.gitignore`.
 
 ---
 
-## 🤖 GitHub Actions Setup (Scheduled Daily Runs)
+## GitHub Actions Setup (Scheduled Daily Runs)
 
 To run daily submissions automatically on GitHub Actions:
 
@@ -140,16 +169,19 @@ To run daily submissions automatically on GitHub Actions:
      [Convert]::ToBase64String([IO.File]::ReadAllBytes("storageState.json"))
      ```
 2. **Add GitHub Repository Secrets**:
-   Go to your GitHub repository **Settings** → **Secrets and variables** → **Actions** → **New repository secret**:
+   Go to your GitHub repository **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**:
    - `STORAGE_STATE_BASE64`: Paste the generated base64 string.
    - `FORM_ID` *(Optional)*: Override standard Form ID.
    - `DISABLE_SUBMIT` *(Optional)*: Set to `true` to test in CI without submitting.
 3. **Workflow Schedule**:
    The workflow `.github/workflows/daily-journal.yml` runs automatically Monday through Friday at 10:30 UTC (4:00 PM IST). You can also trigger it manually via the **Actions** tab using `workflow_dispatch`.
 
+> [!NOTE]
+> GitHub Actions automatically caches the daily submission state (`.last_submission.json`) by date. If a scheduled run retries or is manually triggered on the same calendar date, it will safely skip execution to prevent duplicate form submissions.
+
 ---
 
-## 🛠️ Testing & Verification
+## Testing & Verification
 
 Run the native Node.js test suite:
 
@@ -162,18 +194,20 @@ Test coverage includes:
 - `buildPrefilledUrl()` URL encoding & entry mapping
 - `getMidnightISO()` timezone-safe ISO timestamp generation
 - `generateCommitSummary()` fallback summary generation
+- `hasAlreadySubmittedToday()` & `recordSubmissionSuccess()` date tracking
 - Dry-run & configuration parsing
 
 ---
 
-## ⚙️ Environment Variables Reference
+## Environment Variables Reference
 
 | Variable | Required | Description | Default |
 | :--- | :--- | :--- | :--- |
-| `FORM_ID` | Yes | Target Google Form ID or URL | Default Coursework Form |
+| `FORM_ID` | Yes | Target Google Form ID or raw URL | Default Coursework Form |
 | `TIMEZONE` | No | Target execution timezone | `Asia/Kolkata` |
 | `STORAGE_STATE_PATH` | No | Path to Playwright session file | `storageState.json` |
 | `DRY_RUN` / `DISABLE_SUBMIT` | No | Set to `true` to disable final submission click | `false` |
+| `ALLOW_MULTIPLE_SUBMISSIONS` | No | Set to `true` to force re-submission on the same day | `false` |
 | `GH_OWNER` | No | GitHub repo owner for commit activity | — |
 | `GH_REPO` | No | GitHub repo name for commit activity | — |
 | `GH_USERNAME` | No | Target GitHub username filter | — |
@@ -181,6 +215,6 @@ Test coverage includes:
 
 ---
 
-## 📜 License
+## License
 
 Distributed under the MIT License. See [`LICENSE`](LICENSE) for details.

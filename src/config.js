@@ -61,4 +61,9 @@ export const config = {
     ['true', '1', 'yes'].includes(String(process.env.DISABLE_SUBMIT || '').toLowerCase()) ||
     process.argv.includes('--dry-run') ||
     process.argv.includes('--disable-submit'),
+
+  allowMultipleSubmissions:
+    ['true', '1', 'yes'].includes(String(process.env.ALLOW_MULTIPLE_SUBMISSIONS || '').toLowerCase()) ||
+    process.argv.includes('--force') ||
+    process.argv.includes('--allow-multiple'),
 };

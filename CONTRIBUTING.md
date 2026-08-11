@@ -1,30 +1,30 @@
-# 🤝 Contributing to Automated Coursework Journal Submission
+# Contributing to Automated Coursework Journal Submission
 
 Thank you for your interest in contributing to **Automated Coursework Journal Submission**! We welcome contributions from developers of all skill levels.
 
 ---
 
-## 📜 Table of Contents
+## Table of Contents
 
-1. [Code of Conduct](#-code-of-conduct)
-2. [How to Contribute](#-how-to-contribute)
+1. [Code of Conduct](#code-of-conduct)
+2. [How to Contribute](#how-to-contribute)
    - [Reporting Bugs](#reporting-bugs)
    - [Suggesting Enhancements](#suggesting-enhancements)
    - [Submitting Pull Requests](#submitting-pull-requests)
-3. [Development Setup](#-development-setup)
-4. [Coding & Style Standards](#-coding--style-standards)
-5. [Testing Directives](#-testing-directives)
-6. [Security Reminders](#-security-reminders)
+3. [Development Setup](#development-setup)
+4. [Coding & Style Standards](#coding--style-standards)
+5. [Testing Directives](#testing-directives)
+6. [Security Reminders](#security-reminders)
 
 ---
 
-## 📜 Code of Conduct
+## Code of Conduct
 
 This project adheres to the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to the project maintainers.
 
 ---
 
-## 🚀 How to Contribute
+## How to Contribute
 
 ### Reporting Bugs
 
@@ -46,7 +46,7 @@ Enhancement suggestions are welcome! When proposing a new feature:
 
 ### Submitting Pull Requests
 
-1. **Fork the Repository**: Create your own fork of `Raph1710/Journal-Autofill`.
+1. **Fork the Repository**: Create your own fork of `Gaurav-205/Journal`.
 2. **Create a Feature Branch**:
    ```bash
    git checkout -b feature/my-new-feature
@@ -67,12 +67,12 @@ Enhancement suggestions are welcome! When proposing a new feature:
 
 ---
 
-## 🛠️ Development Setup
+## Development Setup
 
 1. **Clone your fork**:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/Journal-Autofill.git
-   cd Journal-Autofill
+   git clone https://github.com/YOUR_USERNAME/Journal.git
+   cd Journal
    ```
 2. **Install dependencies**:
    ```bash
@@ -93,7 +93,7 @@ Enhancement suggestions are welcome! When proposing a new feature:
 
 ---
 
-## 🎨 Coding & Style Standards
+## Coding & Style Standards
 
 - **ES Modules**: Use native `import`/`export` syntax. No CommonJS `require()`.
 - **Node.js Target**: Minimum Node.js v20.0.0.
@@ -103,7 +103,7 @@ Enhancement suggestions are welcome! When proposing a new feature:
 
 ---
 
-## 🧪 Testing Directives
+## Testing Directives
 
 All submitted code MUST pass the built-in Node.js test runner:
 
@@ -111,11 +111,11 @@ All submitted code MUST pass the built-in Node.js test runner:
 npm test
 ```
 
-Ensure all 9+ unit tests in `test/check.js` pass with 0 errors before requesting a PR review.
+Ensure all unit tests in `test/check.js` pass with 0 errors before requesting a PR review.
 
 ---
 
-## 🔒 Security Reminders
+## Security Reminders
 
 - **NEVER** commit `storageState.json` or `.env` files.
 - Ensure all personal tokens (`GH_TOKEN`, `COMMIT_READ_TOKEN`) are masked in issue descriptions and PR logs.

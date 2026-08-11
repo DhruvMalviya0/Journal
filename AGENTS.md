@@ -1,23 +1,23 @@
-# ⚡ AGENTS.md — Automated Coursework Journal System Directives
+# AGENTS.md — Automated Coursework Journal System Directives
 
+> [!IMPORTANT]
 > **CRITICAL SYSTEM MANDATE:**
 > Every AI agent operating in this repository MUST follow the guidelines, architecture, security directives, and diagnostic workflows defined in this document without exception.
 
 ---
 
-## 🏛️ Project Overview & Architecture
+## Project Overview & Architecture
 
-**Automated Coursework Journal Submission** is an enterprise-grade Node.js & Playwright automation system that auto-summarizes daily GitHub commit activity for a specific user/repository and submits the entry to Google Forms using an authenticated Google session (`storageState.json`).
+**Automated Coursework Journal Submission** is an enterprise-grade Node.js & Playwright automation system that submits coursework entries to Google Forms using an authenticated Google session (`storageState.json`).
 
 - **Engine**: Node.js v20+ (ES Modules)
 - **Browser Automation**: Playwright Chromium with persistent session state restoration
-- **Commit Fetcher**: GitHub REST API (`/repos/{owner}/{repo}/commits?since=...`)
 - **CI/CD Automation**: Scheduled GitHub Actions workflow (`.github/workflows/daily-journal.yml`)
 - **Testing Engine**: Built-in Node.js Test Runner (`node --test`)
 
 ---
 
-## 🔒 Security & Privacy Directives
+## Security & Privacy Directives
 
 1. **Session State Isolation**: `storageState.json` contains active Google session authentication cookies and MUST NEVER be committed to Git. Enforced via `.gitignore`.
 2. **Secrets Management**: Credentials and session state are base64-encoded and injected via GitHub Repository Secrets (`STORAGE_STATE_BASE64`).
@@ -26,7 +26,7 @@
 
 ---
 
-## 📁 Repository Structure & File Responsibilities
+## Repository Structure & File Responsibilities
 
 ```
 .
@@ -37,7 +37,7 @@
 │   └── diagnose-form.js      # Diagnostic script for inspecting form DOM elements & checkboxes
 ├── src/
 │   ├── config.js             # Environment & configuration loader, dry-run & map parser
-│   ├── summarizer.js         # GitHub REST API commit fetcher & timezone midnight calculation
+│   ├── summarizer.js         # Summary text loader & timezone midnight calculation
 │   ├── urlBuilder.js         # Pre-filled Google Form URL constructor & parameter encoder
 │   └── submit.js             # Headless Playwright runner, form filler & Sunday check
 ├── test/
@@ -52,7 +52,7 @@
 
 ---
 
-## 🧩 Detailed Module Specifications
+## Detailed Module Specifications
 
 ### 1. `src/config.js` — Configuration & Environment Engine
 - **Purpose**: Loads `.env`, parses environment variables, and exports central configuration.
@@ -61,6 +61,7 @@
   - `DEFAULT_ANSWERS`: Pre-configured dictionary of standard coursework responses (`entry.187493348`, `entry.32162408`, etc.).
   - `parseEntryMap()`: Parses `process.env.ENTRY_MAP` JSON string safely with full type checks (`typeof === 'object'`, `!Array.isArray`).
   - `dryRun`: Evaluates flags (`DRY_RUN`, `DISABLE_SUBMIT`, `--dry-run`, `--disable-submit`) into a boolean.
+  - `allowMultipleSubmissions`: Evaluates flags (`ALLOW_MULTIPLE_SUBMISSIONS`, `--force`, `--allow-multiple`) into a boolean.
 
 ### 2. `src/urlBuilder.js` — Pre-filled URL Constructor
 - **Purpose**: Generates pre-populated Google Form URLs with encoded `entry.XXXXX` parameters.
@@ -68,16 +69,18 @@
   - `buildPrefilledUrl({ formId, entryMap, journalSummaryText })`: Extracts clean form ID from raw URLs, validates inputs, handles string/object maps, maps `JOURNAL_TEXT` placeholders, and encodes query strings.
 
 ### 3. `src/summarizer.js` — Activity Summarizer & Timezone Engine
-- **Purpose**: Calculates target timezone midnight ISO timestamps and queries the GitHub REST API for daily commit activity.
+- **Purpose**: Calculates target timezone midnight ISO timestamps and exports standard coursework summary text.
 - **Key Logic**:
   - `getMidnightISO(timezone, date)`: Computes exact UTC ISO string for midnight (00:00:00) of the current day in target timezone (`Asia/Kolkata` default).
   - `getFormattedToday(timezone, date)`: Formats date as `YYYY-MM-DD`.
-  - `generateCommitSummary(opts)`: Fetches commits from GitHub API, extracts unique first-line messages, or gracefully returns default summary text if unconfigured/offline.
+  - `generateCommitSummary(opts)`: Generates clean daily coursework journal summary text.
 
 ### 4. `src/submit.js` — Playwright Automation Engine
 - **Purpose**: Main execution entrypoint for headless browser form interaction.
 - **Key Logic**:
   - `isSunday(timezone, date)`: Returns `true` if current day is Sunday in target timezone to skip weekend executions cleanly (`exit 0`).
+  - `hasAlreadySubmittedToday(timezone, date)`: Checks `.last_submission.json` to prevent duplicate daily submissions when triggered multiple times on the same day.
+  - `recordSubmissionSuccess(timezone, date)`: Writes `.last_submission.json` state file upon confirmed form submission.
   - `fillCurrentPage()`: Automatically dismisses "Continue draft" modals, checks mandatory email consent checkboxes, selects working day radio options, and fills empty text inputs/textareas.
   - Page Loop: Iterates through multi-section forms by locating `Next` and `Submit` buttons, saving progress screenshots to `screenshots/`.
   - Dry Run Handling: Logs form validation success without triggering the final submit click when dry-run mode is active.
@@ -88,7 +91,7 @@
 
 ---
 
-## 🛠️ Operational & Diagnostic Workflows
+## Operational & Diagnostic Workflows
 
 ### 1. Handling Expired Google Sessions
 If CI/CD or local submission fails with `Authentication failed! redirected to Google sign-in page`:
@@ -99,7 +102,7 @@ If CI/CD or local submission fails with `Authentication failed! redirected to Go
 
 ### 2. Form Layout / DOM Selector Drift
 Google Forms periodically updates UI class names. If navigation fails:
-1. Run `node scripts/diagnose-form.js` to dump current form HTML and inspect ARIA locators.
+1. Run `npm run diagnose` to dump current form HTML and inspect ARIA locators.
 2. Update selector strategies in `src/submit.js` maintaining multi-tier ARIA/role fallbacks (e.g. `getByRole('button')` combined with `locator('div[role="button"]')`).
 
 ### 3. Testing Directives
@@ -107,6 +110,6 @@ Agents modifying core logic MUST run `npm test` before committing changes. All u
 
 ---
 
-## 📜 Compliance Mandate
+## Compliance Mandate
 
 All AI agents must ensure code changes remain ES Module compatible, adhere to strict error-handling practices, and maintain clear separation between secrets and codebase files.

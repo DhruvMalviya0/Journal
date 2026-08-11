@@ -28,7 +28,7 @@ try {
   browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
 } catch (err) {
   if (err.message.includes('Executable doesn\'t exist') || err.message.includes('npx playwright install')) {
-    console.error('\n❌ ERROR: Playwright Chromium browser binary is missing.');
+    console.error('\n[ERROR] Playwright Chromium browser binary is missing.');
     console.error('Please run "npx playwright install chromium" to install browser binaries.\n');
     process.exit(1);
   }

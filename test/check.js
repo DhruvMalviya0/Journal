@@ -1,8 +1,9 @@
 import assert from 'node:assert';
 import test from 'node:test';
+import fs from 'node:fs';
 import { getMidnightISO, getFormattedToday, generateCommitSummary } from '../src/summarizer.js';
 import { buildPrefilledUrl } from '../src/urlBuilder.js';
-import { isSunday } from '../src/submit.js';
+import { isSunday, hasAlreadySubmittedToday, recordSubmissionSuccess, getSubmissionStatePath } from '../src/submit.js';
 import { config } from '../src/config.js';
 
 test('isSunday correctly detects Sunday vs non-Sunday', () => {
@@ -112,3 +113,30 @@ test('getMidnightISO and getFormattedToday handle invalid dates and fallback tim
   const formatted = getFormattedToday('Invalid/Timezone', new Date('invalid'));
   assert.match(formatted, /^\d{4}-\d{2}-\d{2}$/);
 });
+
+test('recordSubmissionSuccess and hasAlreadySubmittedToday work correctly for date state tracking', () => {
+  const statePath = getSubmissionStatePath();
+  const backup = fs.existsSync(statePath) ? fs.readFileSync(statePath, 'utf8') : null;
+
+  try {
+    const testDate = new Date('2026-08-11T12:00:00Z');
+    assert.strictEqual(hasAlreadySubmittedToday('UTC', testDate), false);
+
+    recordSubmissionSuccess('UTC', testDate);
+    assert.strictEqual(hasAlreadySubmittedToday('UTC', testDate), true);
+
+    const otherDate = new Date('2026-08-12T12:00:00Z');
+    assert.strictEqual(hasAlreadySubmittedToday('UTC', otherDate), false);
+  } finally {
+    if (backup !== null) {
+      fs.writeFileSync(statePath, backup, 'utf8');
+    } else if (fs.existsSync(statePath)) {
+      fs.unlinkSync(statePath);
+    }
+  }
+});
+
+test('config parses allowMultipleSubmissions setting correctly', () => {
+  assert.strictEqual(typeof config.allowMultipleSubmissions, 'boolean');
+});
+

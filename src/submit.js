@@ -2,8 +2,50 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 import { config, DEFAULT_ANSWERS } from './config.js';
-import { generateCommitSummary } from './summarizer.js';
+import { generateCommitSummary, getFormattedToday } from './summarizer.js';
 import { buildPrefilledUrl } from './urlBuilder.js';
+
+/**
+ * Returns the path to the daily submission state file.
+ */
+export function getSubmissionStatePath() {
+  return path.resolve('.last_submission.json');
+}
+
+/**
+ * Checks if a successful submission has already been recorded for today in target timezone.
+ */
+export function hasAlreadySubmittedToday(timezone = 'Asia/Kolkata', referenceDate = new Date()) {
+  try {
+    const statePath = getSubmissionStatePath();
+    if (!fs.existsSync(statePath)) return false;
+    const content = fs.readFileSync(statePath, 'utf8');
+    const data = JSON.parse(content);
+    const today = getFormattedToday(timezone, referenceDate);
+    return data.lastSubmittedDate === today && data.status === 'SUCCESS';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Records a successful submission for today in target timezone.
+ */
+export function recordSubmissionSuccess(timezone = 'Asia/Kolkata', referenceDate = new Date()) {
+  try {
+    const statePath = getSubmissionStatePath();
+    const today = getFormattedToday(timezone, referenceDate);
+    const stateData = {
+      lastSubmittedDate: today,
+      timestamp: new Date().toISOString(),
+      timezone,
+      status: 'SUCCESS',
+    };
+    fs.writeFileSync(statePath, JSON.stringify(stateData, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('Warning: Could not save submission state file:', err.message);
+  }
+}
 
 /**
  * Checks if today is Sunday in the target timezone.
@@ -28,7 +70,7 @@ async function runScheduledSubmission() {
   console.log('=== Automated Coursework Journal Submission ===\n');
 
   if (config.dryRun) {
-    console.log('⚠️  [DRY RUN MODE ENABLED] Form submission is disabled via configuration (DRY_RUN / DISABLE_SUBMIT).\n');
+    console.log('[WARN] [DRY RUN MODE ENABLED] Form submission is disabled via configuration (DRY_RUN / DISABLE_SUBMIT).\n');
   }
 
   // 1. Skip on Sundays
@@ -37,17 +79,24 @@ async function runScheduledSubmission() {
     process.exit(0);
   }
 
+  // 1b. Skip if already submitted today (unless force/allowMultipleSubmissions is set)
+  if (!config.allowMultipleSubmissions && hasAlreadySubmittedToday(config.timezone)) {
+    const today = getFormattedToday(config.timezone);
+    console.log(`[SKIP] Coursework journal has already been submitted today (${today}) in ${config.timezone}. Skipping duplicate execution.`);
+    process.exit(0);
+  }
+
   // 2. Validate session file existence
   const storagePath = path.resolve(config.storageStatePath);
   if (!fs.existsSync(storagePath)) {
-    console.error(`❌ ERROR: Storage state file not found at '${storagePath}'.`);
+    console.error(`[ERROR] Storage state file not found at '${storagePath}'.`);
     console.error('Please run "npm run login" locally to generate the session file.');
     process.exit(1);
   }
 
   // 3. Validate configuration
   if (!config.formId) {
-    console.error('❌ ERROR: FORM_ID environment variable is missing.');
+    console.error('[ERROR] FORM_ID environment variable is missing.');
     process.exit(1);
   }
 
@@ -88,7 +137,7 @@ async function runScheduledSubmission() {
     });
   } catch (err) {
     if (err.message.includes('Executable doesn\'t exist') || err.message.includes('npx playwright install')) {
-      console.error('\n❌ ERROR: Playwright Chromium browser binary is missing.');
+      console.error('\n[ERROR] Playwright Chromium browser binary is missing.');
       console.error('Please run "npx playwright install chromium" to install browser binaries.\n');
       process.exit(1);
     }
@@ -127,7 +176,7 @@ async function runScheduledSubmission() {
       screenshotIndex++;
       const filename = path.join(screenshotsDir, `page-${String(screenshotIndex).padStart(2, '0')}-${label}.png`);
       await page.screenshot({ path: filename, fullPage: true }).catch(() => {});
-      console.log(`  📸 Screenshot: ${filename}`);
+      console.log(`  [SCREENSHOT] Saved: ${filename}`);
     }
 
     // Helper: fill all required fields on the current page section
@@ -137,7 +186,7 @@ async function runScheduledSubmission() {
         'div[role="dialog"] button:has-text("Continue"), div[role="dialog"] div[role="button"]:has-text("Continue"), div[role="dialog"] button:has-text("Restore"), div[role="dialog"] div[role="button"]:has-text("Restore")'
       ).first();
       if (await continueBtn.isVisible({ timeout: 1500 }).catch(() => false)) {
-        console.log('  Dismissing "Continue current draft?" popup modal...');
+        console.log('  [ACTION] Dismissing "Continue current draft?" popup modal...');
         await continueBtn.click({ force: true }).catch(() => {});
         await page.waitForTimeout(500);
       }
@@ -158,7 +207,7 @@ async function runScheduledSubmission() {
             .catch(() => '');
 
           if (containerText.includes('email') || containerText.includes('record')) {
-            console.log('  Checking email consent checkbox...');
+            console.log('  [ACTION] Checking email consent checkbox...');
             await cb.click({ force: true }).catch(() => {});
             await page.waitForTimeout(300);
           }
@@ -172,7 +221,7 @@ async function runScheduledSubmission() {
       if (await workingDayRadio.isVisible({ timeout: 2000 }).catch(() => false)) {
         const selected = await workingDayRadio.getAttribute('aria-checked').catch(() => 'false');
         if (selected !== 'true') {
-          console.log('  ✓ Selecting working day radio');
+          console.log('  [ACTION] Selected working day radio option');
           await workingDayRadio.click({ force: true });
           await page.waitForTimeout(500);
         }
@@ -252,7 +301,7 @@ async function runScheduledSubmission() {
               answerToUse = journalSummaryText || 'Worked on assigned tasks as per daily plan.';
             }
 
-            console.log(`  ✓ Filled [${targetEntryKey}] (Page ${currentPageNum}): "${answerToUse.substring(0, 45)}..."`);
+            console.log(`  [FIELD] Filled [${targetEntryKey}] (Page ${currentPageNum}): "${answerToUse.substring(0, 45)}..."`);
             await field.fill(answerToUse).catch(() => {});
           }
         }
@@ -281,7 +330,7 @@ async function runScheduledSubmission() {
         await takeScreenshot(`p${pageCount}-submit-page`);
         
         if (config.dryRun) {
-          console.log('\n🔒 [DRY RUN / FORM FILL DISABLED] Submit button located. Form was filled & validated successfully!');
+          console.log('\n[INFO] [DRY RUN / FORM FILL DISABLED] Submit button located. Form was filled & validated successfully!');
           console.log('Skipping actual form submission as DRY_RUN / DISABLE_SUBMIT is enabled.\n');
           await browser.close();
           process.exit(0);
@@ -301,7 +350,7 @@ async function runScheduledSubmission() {
         .first();
 
       if (await nextButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-        console.log(`  → Clicking Next button (page ${pageCount})...`);
+        console.log(`  -> Clicking Next button (page ${pageCount})...`);
         
         // Take screenshot BEFORE clicking Next
         await takeScreenshot(`p${pageCount}-before-next`);
@@ -325,7 +374,7 @@ async function runScheduledSubmission() {
 
     if (config.dryRun) {
       await takeScreenshot('dryrun-final');
-      console.log('\n🔒 [DRY RUN / FORM FILL DISABLED] Form process completed in Dry Run mode.');
+      console.log('\n[INFO] [DRY RUN / FORM FILL DISABLED] Form process completed in Dry Run mode.');
       await browser.close();
       process.exit(0);
     }
@@ -342,20 +391,22 @@ async function runScheduledSubmission() {
     const confirmed = await confirmationTextLocator.isVisible({ timeout: 15000 }).catch(() => false);
 
     if (confirmed) {
+      recordSubmissionSuccess(config.timezone);
       await takeScreenshot('confirmation');
-      console.log('\n🎉 SUCCESS: Journal entry successfully submitted to Google Form with verified email session!');
+      console.log('\n[SUCCESS] Journal entry successfully submitted to Google Form with verified session!');
     } else {
       const finalUrl = page.url();
       if (finalUrl.includes('accounts.google.com')) {
         throw new Error('Session expired during submission. Please run "npm run login" again.');
       }
+      recordSubmissionSuccess(config.timezone);
       await page.screenshot({ path: 'submit-result.png', fullPage: true });
-      console.log('\n✅ Form submitted. Could not detect confirmation text — check submit-result.png to verify.');
+      console.log('\n[SUCCESS] Form submitted. Could not detect confirmation text — check submit-result.png to verify.');
     }
     await browser.close();
     process.exit(0);
   } catch (error) {
-    console.error('\n❌ SUBMISSION FAILED:', error.message);
+    console.error('\n[ERROR] SUBMISSION FAILED:', error.message);
     if (browser) {
       // Try to grab a failure screenshot if page is still open
       try {
@@ -364,7 +415,7 @@ async function runScheduledSubmission() {
           const screenshotsDir = path.resolve('screenshots');
           if (!fs.existsSync(screenshotsDir)) fs.mkdirSync(screenshotsDir);
           await pages[0].screenshot({ path: path.join(screenshotsDir, 'error-state.png'), fullPage: true });
-          console.error('  📸 Error screenshot saved: screenshots/error-state.png');
+          console.error('  [SCREENSHOT] Error screenshot saved to screenshots/error-state.png');
         }
       } catch {}
       await browser.close();
