@@ -8,6 +8,7 @@ storageState.json
 .last_submission.json
 
 # Playwright / Testing
+screenshots/
 test-results/
 playwright-report/
 blob-report/
