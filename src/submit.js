@@ -115,7 +115,7 @@ async function runScheduledSubmission() {
   const storagePath = path.resolve(config.storageStatePath);
   if (!fs.existsSync(storagePath)) {
     console.error(`[ERROR] Storage state file not found at '${storagePath}'.`);
-    console.error('Please run "npm run login" locally to generate the session file.');
+    console.error('Please run "npm run refresh-session" locally to generate and rotate the session file.');
     recordSubmissionStatus('FAILED_MISSING_STORAGE_STATE', { storagePath });
     process.exit(1);
   }
@@ -188,7 +188,7 @@ async function runScheduledSubmission() {
     // Check if redirected to Google Authentication page
     if (currentUrl.includes('accounts.google.com') || currentUrl.includes('ServiceLogin')) {
       throw new Error(
-        'Authentication failed! redirected to Google sign-in page. Saved session in storageState.json is expired or invalid. Please run "npm run login" again to refresh session.'
+        'Authentication failed! redirected to Google sign-in page. Saved session in storageState.json is expired or invalid. Please run "npm run refresh-session" again to refresh session.'
       );
     }
 
@@ -427,7 +427,7 @@ async function runScheduledSubmission() {
     } else {
       const finalUrl = page.url();
       if (finalUrl.includes('accounts.google.com')) {
-        throw new Error('Session expired during submission. Please run "npm run login" again.');
+        throw new Error('Session expired during submission. Please run "npm run refresh-session" again.');
       }
       recordSubmissionSuccess(config.timezone);
       recordSubmissionStatus('SUCCESS_WITH_UNVERIFIED_CONFIRMATION', { timezone: config.timezone });
