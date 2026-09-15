@@ -13,6 +13,28 @@ export function getSubmissionStatePath() {
 }
 
 /**
+ * Returns the path to the machine-readable submission status file.
+ */
+export function getSubmissionStatusPath() {
+  return path.resolve('.submission_status.json');
+}
+
+/**
+ * Records machine-readable submission status for CI workflow branching.
+ */
+export function recordSubmissionStatus(status, details = {}) {
+  try {
+    const statusPath = getSubmissionStatusPath();
+    const data = {
+      status,
+      timestamp: new Date().toISOString(),
+      ...details,
+    };
+    fs.writeFileSync(statusPath, JSON.stringify(data, null, 2), 'utf8');
+  } catch {}
+}
+
+/**
  * Checks if a successful submission has already been recorded for today in target timezone.
  */
 export function hasAlreadySubmittedToday(timezone = 'Asia/Kolkata', referenceDate = new Date()) {
@@ -68,6 +90,7 @@ export function isSunday(timezone = 'Asia/Kolkata', referenceDate = new Date()) 
 
 async function runScheduledSubmission() {
   console.log('=== Automated Coursework Journal Submission ===\n');
+  recordSubmissionStatus('STARTED', { timezone: config.timezone });
 
   if (config.dryRun) {
     console.log('[WARN] [DRY RUN MODE ENABLED] Form submission is disabled via configuration (DRY_RUN / DISABLE_SUBMIT).\n');
@@ -76,6 +99,7 @@ async function runScheduledSubmission() {
   // 1. Skip on Sundays
   if (isSunday(config.timezone)) {
     console.log(`[SKIP] Today is Sunday in ${config.timezone}. Skipping journal submission as scheduled.`);
+    recordSubmissionStatus('SKIPPED_SUNDAY', { timezone: config.timezone });
     process.exit(0);
   }
 
@@ -83,6 +107,7 @@ async function runScheduledSubmission() {
   if (!config.allowMultipleSubmissions && hasAlreadySubmittedToday(config.timezone)) {
     const today = getFormattedToday(config.timezone);
     console.log(`[SKIP] Coursework journal has already been submitted today (${today}) in ${config.timezone}. Skipping duplicate execution.`);
+    recordSubmissionStatus('SKIPPED_ALREADY_SUBMITTED', { timezone: config.timezone, date: today });
     process.exit(0);
   }
 
@@ -91,12 +116,14 @@ async function runScheduledSubmission() {
   if (!fs.existsSync(storagePath)) {
     console.error(`[ERROR] Storage state file not found at '${storagePath}'.`);
     console.error('Please run "npm run login" locally to generate the session file.');
+    recordSubmissionStatus('FAILED_MISSING_STORAGE_STATE', { storagePath });
     process.exit(1);
   }
 
   // 3. Validate configuration
   if (!config.formId) {
     console.error('[ERROR] FORM_ID environment variable is missing.');
+    recordSubmissionStatus('FAILED_MISSING_FORM_ID');
     process.exit(1);
   }
 
@@ -332,6 +359,7 @@ async function runScheduledSubmission() {
         if (config.dryRun) {
           console.log('\n[INFO] [DRY RUN / FORM FILL DISABLED] Submit button located. Form was filled & validated successfully!');
           console.log('Skipping actual form submission as DRY_RUN / DISABLE_SUBMIT is enabled.\n');
+          recordSubmissionStatus('DRY_RUN_SUCCESS');
           await browser.close();
           process.exit(0);
         }
@@ -375,6 +403,7 @@ async function runScheduledSubmission() {
     if (config.dryRun) {
       await takeScreenshot('dryrun-final');
       console.log('\n[INFO] [DRY RUN / FORM FILL DISABLED] Form process completed in Dry Run mode.');
+      recordSubmissionStatus('DRY_RUN_SUCCESS');
       await browser.close();
       process.exit(0);
     }
@@ -392,6 +421,7 @@ async function runScheduledSubmission() {
 
     if (confirmed) {
       recordSubmissionSuccess(config.timezone);
+      recordSubmissionStatus('SUCCESS', { timezone: config.timezone });
       await takeScreenshot('confirmation');
       console.log('\n[SUCCESS] Journal entry successfully submitted to Google Form with verified session!');
     } else {
@@ -400,12 +430,18 @@ async function runScheduledSubmission() {
         throw new Error('Session expired during submission. Please run "npm run login" again.');
       }
       recordSubmissionSuccess(config.timezone);
+      recordSubmissionStatus('SUCCESS_WITH_UNVERIFIED_CONFIRMATION', { timezone: config.timezone });
       await page.screenshot({ path: 'submit-result.png', fullPage: true });
       console.log('\n[SUCCESS] Form submitted. Could not detect confirmation text — check submit-result.png to verify.');
     }
     await browser.close();
     process.exit(0);
   } catch (error) {
+    const errorMessage = error?.message || String(error || 'Unknown error');
+    const authExpired = errorMessage.includes('Authentication failed! redirected to Google sign-in page')
+      || errorMessage.includes('Session expired during submission');
+    recordSubmissionStatus(authExpired ? 'AUTH_EXPIRED' : 'FAILED', { error: errorMessage });
+
     console.error('\n[ERROR] SUBMISSION FAILED:', error.message);
     if (browser) {
       // Try to grab a failure screenshot if page is still open

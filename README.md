@@ -33,17 +33,16 @@ If you are not an admin of this repository, you can deploy your own **100% autom
 3. **Generate Session File Locally**:
    - Clone your fork: `git clone https://github.com/YOUR_USERNAME/Journal.git && cd Journal`
    - Run `npm install` and configure your `FORM_ID` in `.env`
-   - Run `npm run login`, sign in to Google, and press **[ENTER]** in terminal to generate `storageState.json`.
-4. **Base64 Encode Session File**:
-   - **PowerShell (Windows)**: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("storageState.json"))`
-   - **macOS / Linux**: `base64 -w 0 storageState.json`
+   - Run `npm run refresh-session` and complete the interactive login flow.
+4. **Copy Base64 Session Output**:
+   - `npm run refresh-session` prints the exact value for `STORAGE_STATE_BASE64` after login succeeds.
 5. **Add Repository Secret**:
    - In your fork on GitHub, go to **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**.
-   - Create secret `STORAGE_STATE_BASE64` and paste your base64 string.
+   - Create secret `STORAGE_STATE_BASE64` and paste the printed value.
    - *(Optional Secrets)*: `FORM_ID`, `GH_USERNAME`, `GH_TOKEN`, `TIMEZONE`.
 
 > [!TIP]
-> **Fully Automated Execution**: Once configured, your fork's GitHub Actions workflow runs on schedule every Monday-Friday at 4:00 PM IST (10:30 UTC) in production without any manual input required! You can also click **Actions** -> **Daily Coursework Journal Submission** -> **Run workflow** to trigger manual submissions anytime.
+> **Operational Note**: Submission is automated, but Google authentication renewal is still manual. If the workflow detects an expired session, it creates/updates a reminder issue and you should run `npm run refresh-session` locally to rotate `STORAGE_STATE_BASE64`.
 
 ---
 
@@ -54,7 +53,7 @@ If you are not an admin of this repository, you can deploy your own **100% autom
 - **Once-Per-Day Guard**: Tracks daily submission state via `.last_submission.json` and GitHub Actions cache to prevent duplicate form submissions if the job executes multiple times a day. Pass `--force` or `ALLOW_MULTIPLE_SUBMISSIONS=true` to override.
 - **Multi-Page Form Navigation**: Automatically handles Google Form section transitions (`Next`), radio selections ("Present / Working Day"), draft popups ("Continue current draft?"), and mandatory email consent checkboxes.
 - **Dry-Run Safety Controls**: Includes safety controls (`DRY_RUN=true` / `DISABLE_SUBMIT=true`) to validate form filling without triggering actual submissions.
-- **Schedule & Sunday Skip**: Configured for scheduled GitHub Actions cron jobs (Mon–Fri at 16:00 IST / 10:30 UTC), automatically skipping Sunday executions.
+- **Schedule, Health-Check & Sunday Skip**: Includes a weekday submission run (Mon–Fri at 16:00 IST / 10:30 UTC) and a weekday dry-run health check to detect expired sessions early, while still skipping Sunday submissions.
 - **Debug Screenshots**: Automatically captures page-by-page progress screenshots to simplify DOM element troubleshooting.
 
 ---
@@ -67,6 +66,7 @@ If you are not an admin of this repository, you can deploy your own **100% autom
 │   └── daily-journal.yml     # Scheduled daily GitHub Actions workflow (Mon-Fri 10:30 UTC / 4:00 PM IST)
 ├── scripts/
 │   ├── login.js              # One-time interactive Google authentication script
+│   ├── refresh-session.js    # Interactive login + base64 secret output helper
 │   └── diagnose-form.js      # Diagnostic script for inspecting form DOM elements & checkboxes
 ├── src/
 │   ├── config.js             # Environment variables & default entry map loader
@@ -136,45 +136,48 @@ DRY_RUN=true
 
 ---
 
-## One-Time Authentication Setup
+## Authentication Setup & Refresh
 
 Google Forms requiring user sign-in cannot be filled anonymously. Follow these steps once on your local machine to save your authenticated session cookies:
 
-1. **Run the interactive login script**:
+1. **Run the session refresh helper**:
    ```bash
-   npm run login
+   npm run refresh-session
    ```
 2. A visible Chromium browser window will open and navigate to your Google Form.
 3. Sign in to your verified coursework Google Account.
 4. Ensure the form is visible with your email displayed.
 5. Return to your terminal and press **[ENTER]**.
-6. The script will inspect form fields, output entry IDs, and save session cookies to `storageState.json`.
+6. The script inspects form fields, saves session cookies to `storageState.json`, and prints a base64 value for `STORAGE_STATE_BASE64`.
 
 > [!CAUTION]
 > **Security Warning**: Never commit `storageState.json` to git or version control! It contains active Google account session cookies. It is strictly excluded in `.gitignore`.
 
 ---
 
-## GitHub Actions Setup (Scheduled Daily Runs)
+## GitHub Actions Setup (Scheduled Runs + Auth Recovery)
 
 To run daily submissions automatically on GitHub Actions:
 
-1. **Encode your local `storageState.json` to base64**:
-   - **Linux / macOS**:
-     ```bash
-     base64 -w 0 storageState.json
-     ```
-   - **Windows (PowerShell)**:
-     ```powershell
-     [Convert]::ToBase64String([IO.File]::ReadAllBytes("storageState.json"))
-     ```
+1. **Generate and print refreshed session value**:
+   ```bash
+   npm run refresh-session
+   ```
 2. **Add GitHub Repository Secrets**:
    Go to your GitHub repository **Settings** -> **Secrets and variables** -> **Actions** -> **New repository secret**:
-   - `STORAGE_STATE_BASE64`: Paste the generated base64 string.
+   - `STORAGE_STATE_BASE64`: Paste the printed base64 string.
    - `FORM_ID` *(Optional)*: Override standard Form ID.
    - `DISABLE_SUBMIT` *(Optional)*: Set to `true` to test in CI without submitting.
 3. **Workflow Schedule**:
-   The workflow `.github/workflows/daily-journal.yml` runs automatically Monday through Friday at 10:30 UTC (4:00 PM IST). You can also trigger it manually via the **Actions** tab using `workflow_dispatch`.
+   The workflow `.github/workflows/daily-journal.yml` runs:
+   - **Submission run**: Monday through Friday at 10:30 UTC (4:00 PM IST)
+   - **Health-check dry-run**: Monday through Friday at 04:00 UTC
+   - You can also trigger it manually via the **Actions** tab using `workflow_dispatch`.
+
+4. **When session expires**:
+   - The workflow records machine-readable status (`AUTH_EXPIRED`) and creates/updates a reminder issue.
+   - Refresh locally with `npm run refresh-session`.
+   - Replace the `STORAGE_STATE_BASE64` secret with the new printed value.
 
 > [!NOTE]
 > GitHub Actions automatically caches the daily submission state (`.last_submission.json`) by date. If a scheduled run retries or is manually triggered on the same calendar date, it will safely skip execution to prevent duplicate form submissions.
