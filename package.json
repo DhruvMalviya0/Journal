@@ -6,6 +6,7 @@
   "main": "src/submit.js",
   "scripts": {
     "login": "node scripts/login.js",
+    "refresh-session": "node scripts/refresh-session.js",
     "diagnose": "node scripts/diagnose-form.js",
     "start": "node src/submit.js",
     "test": "node --test",
