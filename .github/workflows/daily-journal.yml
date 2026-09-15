@@ -108,27 +108,35 @@ jobs:
               '',
               'Please run `npm run refresh-session` locally and update the `STORAGE_STATE_BASE64` repository secret.'
             ].join('\n');
-            const { data: issues } = await github.rest.issues.listForRepo({
-              owner,
-              repo,
-              state: 'open',
-              per_page: 100
-            });
-            const existing = issues.find((issue) => issue.title === title);
-            if (existing) {
-              await github.rest.issues.update({
+            try {
+              const { data: issues } = await github.rest.issues.listForRepo({
                 owner,
                 repo,
-                issue_number: existing.number,
-                body
+                state: 'open',
+                per_page: 100
               });
-            } else {
-              await github.rest.issues.create({
-                owner,
-                repo,
-                title,
-                body
-              });
+              const existing = issues.find((issue) => issue.title === title);
+              if (existing) {
+                await github.rest.issues.update({
+                  owner,
+                  repo,
+                  issue_number: existing.number,
+                  body
+                });
+              } else {
+                await github.rest.issues.create({
+                  owner,
+                  repo,
+                  title,
+                  body
+                });
+              }
+            } catch (error) {
+              if (error.status === 410) {
+                core.warning('Repository issues are disabled; skipping auth-expired reminder issue creation.');
+                return;
+              }
+              throw error;
             }
 
       - name: Save daily submission state to cache
