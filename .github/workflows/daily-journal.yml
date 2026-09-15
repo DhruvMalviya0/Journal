@@ -61,7 +61,22 @@ jobs:
           STORAGE_STATE_PATH: storageState.json
           DISABLE_SUBMIT: "false"
           DRY_RUN: "false"
-        run: npm start
+        run: |
+          set +e
+          npm start 2>&1 | tee submit.log
+          submit_exit=${PIPESTATUS[0]}
+          set -e
+
+          if [ "$submit_exit" -eq 0 ]; then
+            exit 0
+          fi
+
+          if grep -q 'Authentication failed! redirected to Google sign-in page' submit.log; then
+            echo "::warning::Google session in STORAGE_STATE_BASE64 appears expired. Run 'npm run login' locally and update the STORAGE_STATE_BASE64 secret."
+            exit 0
+          fi
+
+          exit "$submit_exit"
 
       - name: Save daily submission state to cache
         if: always()
